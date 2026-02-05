@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM</title>
+    <title>Global Chemical Control Tower | JS KIM</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -11,7 +11,7 @@
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
         #map { flex-grow: 1; height: 100%; background: #DAEAF1; z-index: 1; }
         
-        /* 줌 및 마커 동기화 최적화 */
+        /* 줌 및 마커 움직임 동기화 */
         .leaflet-zoom-animated { transition: transform 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) !important; }
         .leaflet-marker-icon { transition: none !important; }
 
@@ -24,8 +24,8 @@
         .tab-btn.active { background: var(--accent); color: white; }
         
         .header { background: var(--primary); color: white; padding: 22px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        /* 제작자 문구: 진노랑, 1.3rem(기본보다 30% 크게) */
-        .created-by { font-size: 1.3rem; color: #FFD700; font-weight: 900; margin-bottom: 10px; display: block; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); letter-spacing: 0.5px; text-transform: uppercase; }
+        /* 제작자 문구: 진노랑(#FFD700), 1.3rem */
+        .created-by { font-size: 1.3rem; color: #FFD700; font-weight: 900; margin-bottom: 10px; display: block; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); letter-spacing: 0.5px; }
         
         #prod-title { margin: 0; font-size: 1.25rem; letter-spacing: -0.5px; cursor: pointer; transition: 0.2s; }
         #prod-title:hover { color: #FFD700; }
@@ -46,7 +46,6 @@
         .open > .collapsible-content { display: block; }
         
         .plant-card { padding: 10px 12px 10px 30px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.72rem; background: white; position: relative; }
-        .plant-card:hover { background: #f0f7ff; }
         .share-tag { font-size: 0.6rem; color: #1597BB; font-weight: bold; margin-left: 5px; }
         .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 1px 6px; border-radius: 10px; font-size: 0.6rem; position: absolute; right: 10px; top: 10px; }
         
@@ -116,6 +115,7 @@
 
     let activeMarkers = [];
 
+    // 사이드바 가림 방지 오프셋 이동 로직
     function moveToPlant(lat, lng) {
         const offset = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360;
         const targetPoint = map.project([lat, lng], 9).subtract([offset / 2, 0]);
@@ -132,7 +132,7 @@
         Papa.parse(sheetURLs[prod] + "?t=" + new Date().getTime(), {
             download: true, header: true, skipEmptyLines: true,
             complete: function(results) {
-                // 헤더 대소문자 무시 처리
+                // 헤더 대소문자 및 공백 무시 (정규화)
                 const data = results.data.map(row => {
                     let newRow = {};
                     for (let key in row) { newRow[key.toLowerCase().trim()] = row[key]; }
@@ -174,7 +174,6 @@
             if(isCur) curLoss += parseFloat(loss);
             if(isFut) futLoss += parseFloat(loss);
 
-            // 마커 스타일링
             let marker;
             const baseSize = Math.sqrt(capa) * 0.55;
             if (isCur || isFut) {
@@ -187,7 +186,8 @@
                     })
                 }).addTo(map);
             } else {
-                const style = Object.entries(regionStyles).find(([k]) => p.region && p.region.toUpperCase().includes(k))?.[1] || regionStyles.Other;
+                const regKey = Object.keys(regionStyles).find(k => p.region && p.region.toUpperCase().includes(k)) || "Other";
+                const style = regionStyles[regKey] || regionStyles.Other;
                 marker = L.circleMarker([lat, lng], {
                     radius: baseSize, fillColor: style.fill, color: style.border, weight: 1.5, fillOpacity: 0.85, stroke: true
                 }).addTo(map);
@@ -198,7 +198,6 @@
             activeMarkers.push(marker);
             p._m = marker;
 
-            // 카드 리스트 생성
             const createCard = (showShare = true) => {
                 const share = ((capa / globalTotalCapa) * 100).toFixed(1);
                 const card = document.createElement('div');
@@ -220,13 +219,11 @@
             regions[reg].totalCapa += capa;
         });
 
-        // 상단 지표 업데이트
         document.getElementById('cur-ratio').innerText = ((curLoss / globalTotalCapa) * 100).toFixed(2) + "%";
         document.getElementById('fut-ratio').innerText = ((futLoss / globalTotalCapa) * 100).toFixed(2) + "%";
         document.getElementById('cur-sum-h').innerText = curLoss.toFixed(1) + "K Loss ▼";
         document.getElementById('fut-sum-h').innerText = futLoss.toFixed(1) + "K Loss ▼";
 
-        // 지역별 아코디언 생성
         Object.values(regions).sort((a,b) => b.totalPlants - a.totalPlants).forEach(r => {
             const rShare = ((r.totalCapa / globalTotalCapa) * 100).toFixed(1);
             const rDiv = document.createElement('div');
