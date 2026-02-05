@@ -11,9 +11,9 @@
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
         #map { flex-grow: 1; height: 100%; background: #DAEAF1; z-index: 1; }
         
-        /* 마커 움직임 완전 동기화 */
+        /* 줌 및 마커 동기화 최적화 */
+        .leaflet-zoom-animated { transition: transform 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) !important; }
         .leaflet-marker-icon { transition: none !important; }
-        .leaflet-zoom-animated { transition-duration: 0.5s !important; }
 
         #sidebar { position: absolute; left: 0; top: 0; width: 360px; height: 100%; background: white; z-index: 2000; transition: transform 0.5s ease; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
         #sidebar.hidden { transform: translateX(-100%); }
@@ -24,7 +24,8 @@
         .tab-btn.active { background: var(--accent); color: white; }
         
         .header { background: var(--primary); color: white; padding: 22px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .created-by { font-size: 1.3rem; color: #FFD700; font-weight: 900; margin-bottom: 12px; display: block; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); letter-spacing: 0.5px; }
+        /* 제작자 문구: 진노랑, 1.3rem(기본보다 30% 크게) */
+        .created-by { font-size: 1.3rem; color: #FFD700; font-weight: 900; margin-bottom: 10px; display: block; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); letter-spacing: 0.5px; text-transform: uppercase; }
         
         #prod-title { margin: 0; font-size: 1.25rem; letter-spacing: -0.5px; cursor: pointer; transition: 0.2s; }
         #prod-title:hover { color: #FFD700; }
@@ -39,23 +40,25 @@
         .risk-header-current { background: var(--current); color: white; }
         .risk-header-future { background: var(--future); color: white; }
         .region-header { background: #cbdceb; color: var(--primary); margin-top: 2px; }
+        .country-header { background: #e8eff5; font-size: 0.7rem; padding-left: 20px; }
         
         .collapsible-content { display: none; }
         .open > .collapsible-content { display: block; }
         
         .plant-card { padding: 10px 12px 10px 30px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.72rem; background: white; position: relative; }
+        .plant-card:hover { background: #f0f7ff; }
         .share-tag { font-size: 0.6rem; color: #1597BB; font-weight: bold; margin-left: 5px; }
         .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 1px 6px; border-radius: 10px; font-size: 0.6rem; position: absolute; right: 10px; top: 10px; }
         
-        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: bold; }
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: bold; }
         .custom-triangle svg { filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.2)); display: block; overflow: visible; }
     </style>
 </head>
 <body>
 
 <div id="loading-overlay">
-    <div style="font-size:1.5rem; color:#0A2647;">📡 LAM Global Intelligence Syncing...</div>
-    <div style="color:#1597BB; margin-top:10px;">Created by JS KIM of LAM</div>
+    <div style="font-size:1.6rem; color:#0A2647; margin-bottom:15px;">📡 LAM GLOBAL INTEL SYNCING...</div>
+    <div style="font-size:1.2rem; color:#D35400;">CREATED BY JS KIM OF LAM</div>
 </div>
 
 <div id="layout">
@@ -72,22 +75,10 @@
         </div>
         
         <div class="metrics-grid">
-            <div class="metric-box">
-                <span class="metric-label">GLOBAL CAPA (K)</span>
-                <span class="metric-value" id="global-val">0</span>
-            </div>
-            <div class="metric-box">
-                <span class="metric-label">TOTAL SITES</span>
-                <span class="metric-value" id="total-sites">0</span>
-            </div>
-            <div class="metric-box" style="background: #1A1A1B;">
-                <span class="metric-label">CUR. LOSS RATIO</span>
-                <span class="metric-value" id="cur-ratio" style="color:#E74C3C">0%</span>
-            </div>
-            <div class="metric-box" style="background: #D35400;">
-                <span class="metric-label">FUT. LOSS RATIO</span>
-                <span class="metric-value" id="fut-ratio" style="color:#F1C40F">0%</span>
-            </div>
+            <div class="metric-box"><span class="metric-label">GLOBAL CAPA (K)</span><span class="metric-value" id="global-val">0</span></div>
+            <div class="metric-box"><span class="metric-label">TOTAL SITES</span><span class="metric-value" id="total-sites">0</span></div>
+            <div class="metric-box" style="background: #1A1A1B;"><span class="metric-label">CUR. LOSS RATIO</span><span class="metric-value" id="cur-ratio" style="color:#E74C3C">0%</span></div>
+            <div class="metric-box" style="background: #D35400;"><span class="metric-label">FUT. LOSS RATIO</span><span class="metric-value" id="fut-ratio" style="color:#F1C40F">0%</span></div>
         </div>
 
         <div id="list-container">
@@ -125,21 +116,13 @@
 
     let activeMarkers = [];
 
-    // ★ BPA 코드의 핵심: 오프셋 이동 함수 ★
     function moveToPlant(lat, lng) {
-        const sidebar = document.getElementById('sidebar');
-        const isHidden = sidebar.classList.contains('hidden');
-        const offset = isHidden ? 0 : 360; // 사이드바 너비
-        
-        // 업체를 사이드바 오른쪽의 빈 공간 정중앙에 배치하는 수학적 계산
+        const offset = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360;
         const targetPoint = map.project([lat, lng], 9).subtract([offset / 2, 0]);
-        map.flyTo(map.unproject(targetPoint, 9), 9, {
-            duration: 1.8,
-            easeLinearity: 0.25
-        });
+        map.flyTo(map.unproject(targetPoint, 9), 9, { duration: 1.5, easeLinearity: 0.25 });
     }
 
-    function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.5 }); }
+    function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
 
     async function switchProduct(prod) {
         document.getElementById('loading-overlay').style.display = 'flex';
@@ -147,14 +130,18 @@
         document.getElementById('btn-' + prod).classList.add('active');
 
         Papa.parse(sheetURLs[prod] + "?t=" + new Date().getTime(), {
-            download: true,
-            header: true,
-            dynamicTyping: true,
+            download: true, header: true, skipEmptyLines: true,
             complete: function(results) {
-                const data = results.data.filter(row => row.Company);
+                // 헤더 대소문자 무시 처리
+                const data = results.data.map(row => {
+                    let newRow = {};
+                    for (let key in row) { newRow[key.toLowerCase().trim()] = row[key]; }
+                    return newRow;
+                }).filter(row => row.company);
+
                 document.getElementById('btn-' + prod).innerText = `${prod} (${data.length})`;
                 renderEverything(data, prod);
-                document.getElementById('loading-overlay').style.display = 'none';
+                setTimeout(() => { document.getElementById('loading-overlay').style.display = 'none'; }, 500);
             }
         });
     }
@@ -166,7 +153,7 @@
         document.getElementById('future-risk-list').innerHTML = '';
         document.getElementById('region-list').innerHTML = '';
 
-        const globalTotalCapa = data.reduce((s, p) => s + (Number(p.Capacity) || 0), 0);
+        const globalTotalCapa = data.reduce((s, p) => s + (Number(p.capacity) || 0), 0);
         document.getElementById('global-val').innerText = Math.round(globalTotalCapa).toLocaleString();
         document.getElementById('total-sites').innerText = data.length;
 
@@ -174,65 +161,72 @@
         const regions = {};
 
         data.forEach(p => {
-            if(!p.Lat || !p.Lng) return;
-            const isCur = p.Status && p.Status.includes('Current');
-            const isFut = p.Status && p.Status.includes('Future');
-            const loss = ((p.Capacity / 365) * (p.Days || 0)).toFixed(1);
+            const lat = parseFloat(p.lat); const lng = parseFloat(p.lng);
+            if(isNaN(lat) || isNaN(lng)) return;
+
+            const status = p.status || "Normal";
+            const isCur = status.includes('Current');
+            const isFut = status.includes('Future');
+            const capa = Number(p.capacity) || 0;
+            const days = Number(p.days) || 0;
+            const loss = ((capa / 365) * days).toFixed(1);
             
             if(isCur) curLoss += parseFloat(loss);
             if(isFut) futLoss += parseFloat(loss);
 
-            // 마커 생성 (세모/동그라미 톤온톤 유지)
+            // 마커 스타일링
             let marker;
-            const baseSize = Math.sqrt(p.Capacity) * 0.55;
+            const baseSize = Math.sqrt(capa) * 0.55;
             if (isCur || isFut) {
                 const color = isCur ? '#1A1A1B' : '#D35400';
                 const iconSize = baseSize * 2.2;
-                marker = L.marker([p.Lat, p.Lng], {
+                marker = L.marker([lat, lng], {
                     icon: L.divIcon({
                         html: `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="${color}" stroke="${isCur?'none':'#A04000'}" stroke-width="${isCur?0:2}"/></svg>`,
                         className: 'custom-triangle', iconSize: [iconSize, iconSize], iconAnchor: [iconSize/2, iconSize/2]
                     })
                 }).addTo(map);
             } else {
-                const style = Object.entries(regionStyles).find(([k]) => p.Region && p.Region.includes(k))?.[1] || regionStyles.Other;
-                marker = L.circleMarker([p.Lat, p.Lng], {
+                const style = Object.entries(regionStyles).find(([k]) => p.region && p.region.toUpperCase().includes(k))?.[1] || regionStyles.Other;
+                marker = L.circleMarker([lat, lng], {
                     radius: baseSize, fillColor: style.fill, color: style.border, weight: 1.5, fillOpacity: 0.85, stroke: true
                 }).addTo(map);
             }
             
-            marker.bindPopup(`<b>${p.Company}</b><br>${p.Location}<br>Capa: ${p.Capacity}K<br>Status: ${p.Status}`);
-            marker.on('click', (e) => moveToPlant(p.Lat, p.Lng));
+            marker.bindPopup(`<b>${p.company}</b><br>${p.location}<br>Capa: ${capa}K<br>Status: ${status}`);
+            marker.on('click', () => moveToPlant(lat, lng));
             activeMarkers.push(marker);
             p._m = marker;
 
-            // 카드 생성
+            // 카드 리스트 생성
             const createCard = (showShare = true) => {
-                const share = ((p.Capacity / globalTotalCapa) * 100).toFixed(1);
+                const share = ((capa / globalTotalCapa) * 100).toFixed(1);
                 const card = document.createElement('div');
                 card.className = `plant-card ${isCur?'current-risk':(isFut?'future-risk':'')}`;
-                card.innerHTML = `${(isCur||isFut) ? `<span class="loss-badge">${loss}K Loss</span>` : ''}<b>${p.Company}</b>${showShare ? `<span class="share-tag">(${share}%)</span>` : ''}<div class="capa-info">${p.Capacity}K MT | ${p.Status}</div>`;
-                card.onclick = () => { moveToPlant(p.Lat, p.Lng); setTimeout(() => p._m.openPopup(), 1600); };
+                card.innerHTML = `${(isCur||isFut) ? `<span class="loss-badge">${loss}K Loss</span>` : ''}<b>${p.company}</b>${showShare ? `<span class="share-tag">(${share}%)</span>` : ''}<div class="capa-info">${capa}K MT | ${status}</div>`;
+                card.onclick = () => { moveToPlant(lat, lng); setTimeout(() => p._m.openPopup(), 1400); };
                 return card;
             };
 
             if(isCur) document.getElementById('current-risk-list').appendChild(createCard(false));
             else if(isFut) document.getElementById('future-risk-list').appendChild(createCard(false));
 
-            if (!regions[p.Region]) regions[p.Region] = { name: p.Region, countries: {}, totalPlants: 0, totalCapa: 0 };
-            if (!regions[p.Region].countries[p.Country]) regions[p.Region].countries[p.Country] = [];
-            regions[p.Region].countries[p.Country].push(createCard(true));
-            regions[p.Region].totalPlants++;
-            regions[p.Region].totalCapa += p.Capacity;
+            const reg = p.region || "Unknown";
+            const cou = p.country || "Other";
+            if (!regions[reg]) regions[reg] = { name: reg, countries: {}, totalPlants: 0, totalCapa: 0 };
+            if (!regions[reg].countries[cou]) regions[reg].countries[cou] = [];
+            regions[reg].countries[cou].push(createCard(true));
+            regions[reg].totalPlants++;
+            regions[reg].totalCapa += capa;
         });
 
-        // 수치 업데이트
+        // 상단 지표 업데이트
         document.getElementById('cur-ratio').innerText = ((curLoss / globalTotalCapa) * 100).toFixed(2) + "%";
         document.getElementById('fut-ratio').innerText = ((futLoss / globalTotalCapa) * 100).toFixed(2) + "%";
         document.getElementById('cur-sum-h').innerText = curLoss.toFixed(1) + "K Loss ▼";
         document.getElementById('fut-sum-h').innerText = futLoss.toFixed(1) + "K Loss ▼";
 
-        // 리스트 렌더링
+        // 지역별 아코디언 생성
         Object.values(regions).sort((a,b) => b.totalPlants - a.totalPlants).forEach(r => {
             const rShare = ((r.totalCapa / globalTotalCapa) * 100).toFixed(1);
             const rDiv = document.createElement('div');
