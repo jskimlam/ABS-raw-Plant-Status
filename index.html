@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v8.2)</title>
+    <title>Global Supply Control Tower | JS KIM (v9.1 Security)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <script src="data/data_sm.js"></script>
@@ -27,11 +27,7 @@
         .header { background: var(--primary); color: white; padding: 22px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); position: relative; }
         .created-by { font-size: 1.3rem; color: #FFD700; font-weight: 900; margin-bottom: 12px; display: block; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
         
-        #data-mode { 
-            position: absolute; right: 15px; top: 15px; font-size: 0.7rem; font-weight: 900; 
-            padding: 4px 10px; border-radius: 15px; background: #95a5a6; color: white;
-            cursor: pointer; z-index: 2002; transition: 0.3s;
-        }
+        #data-mode { position: absolute; right: 15px; top: 15px; font-size: 0.7rem; font-weight: 900; padding: 4px 10px; border-radius: 15px; background: #95a5a6; color: white; cursor: pointer; z-index: 2002; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
 
         .product-tabs { display: flex; background: #051937; padding: 5px; gap: 4px; }
         .tab-btn { flex: 1; padding: 12px 2px; border: none; background: rgba(255,255,255,0.1); color: white; cursor: pointer; font-weight: bold; font-size: 0.75rem; border-radius: 4px; }
@@ -54,42 +50,47 @@
         
         #update-modal {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 400px; background: white; z-index: 11000; padding: 20px;
-            box-shadow: 0 0 50px rgba(0,0,0,0.5); border-radius: 15px; display: none;
+            width: 420px; background: white; z-index: 11000; padding: 25px;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5); border-radius: 20px; display: none;
         }
-        #update-modal textarea { width: 100%; height: 250px; margin: 10px 0; font-size: 0.75rem; border: 1px solid #ccc; padding: 5px; }
+        #update-modal textarea { width: 100%; height: 200px; margin: 10px 0; font-size: 0.75rem; border: 1px solid #ddd; border-radius: 5px; padding: 8px; box-sizing: border-box; }
+        #admin-password { width: 100%; padding: 10px; margin-bottom: 10px; border: 2px solid var(--primary); border-radius: 5px; box-sizing: border-box; font-weight: bold; }
 
-        #security-overlay {
+        #sync-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(10, 38, 71, 0.98); z-index: 10000;
+            background: rgba(10, 38, 71, 0.96); z-index: 10000;
             display: none; flex-direction: column; justify-content: center; align-items: center;
-            color: white; text-align: center; opacity: 1; transition: opacity 0.5s ease;
+            color: white; text-align: center; transition: opacity 0.4s ease;
         }
-        .scanner-line { width: 300px; height: 2px; background: var(--accent); margin: 20px 0; animation: scan 1.5s infinite alternate; }
-        @keyframes scan { from { transform: scaleX(0.1); opacity: 0.5; } to { transform: scaleX(1); opacity: 1; } }
+        .sync-spinner { width: 45px; height: 45px; border: 4px solid rgba(255,255,255,0.2); border-top: 4px solid #FFD700; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; background: rgba(0,0,0,0.85); color: white; padding: 25px; border-radius: 15px; display: none; }
         .custom-triangle svg { filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.2)); display: block; }
     </style>
 </head>
 <body>
 
 <div id="update-modal">
-    <h3 style="margin:0; color:var(--primary);">Manual Update</h3>
-    <textarea id="csv-input" placeholder="시트 전체 복사 후 붙여넣기..."></textarea>
-    <button style="background:var(--primary); color:white; padding:12px; width:100%; border:none; border-radius:8px; cursor:pointer; font-weight:bold;" onclick="saveManualData()">메모리에 저장</button>
-    <button style="width:100%; margin-top:8px; border:none; padding:8px; cursor:pointer;" onclick="document.getElementById('update-modal').style.display='none'">닫기</button>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h3 style="margin:0; color:var(--primary);">🔒 Admin Control Center</h3>
+        <span style="font-size: 0.7rem; color: #999;">JS KIM OF LAM</span>
+    </div>
+    <label style="font-size:0.8rem; font-weight:bold;">Admin Password</label>
+    <input type="password" id="admin-password" placeholder="관리자 암호를 입력하세요">
+    
+    <label style="font-size:0.8rem; font-weight:bold;">CSV Data Paste</label>
+    <textarea id="csv-input" placeholder="구글 시트 전체 복사 후 여기에 붙여넣기"></textarea>
+    
+    <button style="background:var(--primary); color:white; padding:15px; width:100%; border:none; border-radius:10px; cursor:pointer; font-weight:900; font-size:1rem; margin-top:5px;" onclick="saveManualData()">보안 메모리에 즉시 저장</button>
+    <button style="width:100%; margin-top:10px; border:none; padding:10px; border-radius:8px; cursor:pointer; background:#f5f5f5; color:#666;" onclick="document.getElementById('update-modal').style.display='none'">닫기</button>
 </div>
 
-<div id="security-overlay">
-    <div style="font-size: 1.2rem; color: #FF4D4D; font-weight: 800; letter-spacing: 2px;">SECURITY VERIFIED</div>
-    <div class="scanner-line"></div>
-    <div style="font-size: 1.5rem; font-weight: 900; margin-bottom: 10px;">보안 확인: 픽스 모드로 전환</div>
-    <div id="security-status" style="font-size: 1rem; color: #1597BB;">시스템 정밀 검사 중...</div>
-    <div style="margin-top: 50px; color: #FFD700; font-weight: 900; font-size: 1.2rem;">CREATED BY JS KIM OF LAM</div>
+<div id="sync-overlay">
+    <div id="sync-icon" class="sync-spinner"></div>
+    <div id="sync-main-text" style="font-size: 1.8rem; font-weight: 900; margin-bottom: 12px;">동기화 시도 중...</div>
+    <div id="sync-sub-text" style="font-size: 1.1rem; color: #1597BB; font-weight: 500;">Attempting Online Sync...</div>
+    <div style="margin-top: 60px; color: #FFD700; font-weight: 900; font-size: 1.4rem;">CREATED BY JS KIM OF LAM</div>
 </div>
-
-<div id="loading">📡 동기화 시도 중...</div>
 
 <div id="layout">
     <div id="sidebar">
@@ -121,7 +122,7 @@
                 <div class="group-header" style="background:var(--future); color:white" onclick="this.parentElement.classList.toggle('open')"><span>📅 FUTURE MAINT</span><span id="fut-sum-h" style="font-size:0.75rem;"></span></div>
                 <div class="collapsible-content" id="future-risk-list"></div>
             </div>
-            <div style="background: var(--primary); color:white; padding:12px; font-size:0.75rem; font-weight:bold; margin-top:10px;">🌐 REGIONAL DIRECTORY</div>
+            <div style="background: var(--primary); color:white; padding:10px 12px; font-size:0.75rem; font-weight:bold; margin-top:10px;">🌐 REGIONAL DIRECTORY</div>
             <div id="region-list"></div>
         </div>
     </div>
@@ -130,6 +131,9 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+    // ★ 관리자 암호 변경: jskim0111 ★
+    const ADMIN_PASS = "jskim0111"; 
+
     const SHEET_URLS = {
         'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv',
         'AN': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=263516767&single=true&output=csv',
@@ -142,16 +146,33 @@
 
     let activeMarkers = [];
 
-    function showUpdateModal() { document.getElementById('update-modal').style.display = 'block'; }
+    function showUpdateModal() { 
+        document.getElementById('admin-password').value = ""; 
+        document.getElementById('update-modal').style.display = 'block'; 
+    }
+
     function saveManualData() {
-        const input = document.getElementById('csv-input').value;
-        if(!input) return;
-        const parsed = parseCSV(input);
+        const pwInput = document.getElementById('admin-password').value;
+        const csvInput = document.getElementById('csv-input').value;
+
+        if (pwInput !== ADMIN_PASS) {
+            alert("❌ 보안 경고: 관리자 암호가 일치하지 않습니다.");
+            return;
+        }
+
+        if (!csvInput) {
+            alert("데이터를 입력해주세요.");
+            return;
+        }
+
+        const parsed = parseCSV(csvInput);
         if(parsed.length > 0) {
             localStorage.setItem(`MANUAL_DATA_${currentProd}`, JSON.stringify(parsed));
-            alert("메모리에 저장되었습니다.");
+            alert(`✅ 보안 검증 완료: ${currentProd} 데이터가 사장님 전용 메모리에 저장되었습니다.`);
             document.getElementById('update-modal').style.display = 'none';
             renderEverything(parsed, currentProd);
+        } else {
+            alert("데이터 형식이 올바르지 않습니다.");
         }
     }
 
@@ -182,67 +203,68 @@
 
     async function switchProduct(prod) {
         currentProd = prod;
-        document.getElementById('loading').style.display = 'block';
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.getElementById('btn-' + prod).classList.add('active');
+        
+        const overlay = document.getElementById('sync-overlay');
+        const mainText = document.getElementById('sync-main-text');
+        const subText = document.getElementById('sync-sub-text');
+        const icon = document.getElementById('sync-icon');
+
+        overlay.style.display = 'flex';
+        overlay.style.opacity = '1';
+        icon.className = "sync-spinner";
+        mainText.innerText = "동기화 시도 중...";
+        subText.innerText = "Attempting Online Sync...";
 
         try {
             const response = await fetch(SHEET_URLS[prod] + "&t=" + new Date().getTime());
-            if (!response.ok) throw new Error("Fetch Failed");
+            if (!response.ok) throw new Error("Blocked");
             const csvText = await response.text();
             const data = parseCSV(csvText);
+            
+            mainText.innerText = "온라인 연동 완료";
+            subText.innerText = "Online Sync Complete";
+            icon.className = "";
+            icon.innerHTML = "<div style='font-size:50px;'>✅</div>";
+            
             document.getElementById('data-mode').innerText = "LIVE SYNC";
             document.getElementById('data-mode').style.background = "#2ECC71";
             renderEverything(data, prod);
-            document.getElementById('loading').style.display = 'none';
-        } catch (e) {
-            console.warn("Live sync failed, entering security mode:", e);
-            triggerSecurityTransition(prod);
-        }
-    }
-
-    function triggerSecurityTransition(prod) {
-        const overlay = document.getElementById('security-overlay');
-        document.getElementById('loading').style.display = 'none';
-        overlay.style.display = 'flex';
-        overlay.style.opacity = '1';
-
-        setTimeout(() => {
-            let data = [];
-            const localData = localStorage.getItem(`MANUAL_DATA_${prod}`);
             
-            if (localData) {
-                data = JSON.parse(localData);
-                document.getElementById('data-mode').innerText = "MEMORY MODE";
-                document.getElementById('security-status').innerText = "메모리에서 최신 데이터 로드 완료";
-            } else {
-                // ★ 사진 1번의 실제 변수명(data_sm 등)을 전역에서 낚아챔 ★
-                try {
-                    if (prod === 'SM') data = (typeof data_sm !== 'undefined') ? data_sm : [];
-                    if (prod === 'AN') data = (typeof data_an !== 'undefined') ? data_an : [];
-                    if (prod === 'BD') data = (typeof data_bd !== 'undefined') ? data_bd : [];
-                    document.getElementById('data-mode').innerText = "FIXED MODE";
-                    document.getElementById('security-status').innerText = "기존 JS 파일 로드 완료";
-                } catch(err) {
-                    console.error("Fixed data load error:", err);
-                }
-            }
-
-            document.getElementById('data-mode').style.background = "#E74C3C";
-            
-            // ★ 방어 로직: 렌더링 에러가 나도 오버레이는 끈다 ★
-            try {
-                renderEverything(data, prod);
-            } catch(renderErr) {
-                console.error("Render error:", renderErr);
-            }
-            
-            // ★ 강제 종료 타이머 (사진 3번 무한로딩 해결책) ★
             setTimeout(() => {
                 overlay.style.opacity = '0';
-                setTimeout(() => { overlay.style.display = 'none'; }, 500);
+                setTimeout(() => { overlay.style.display = 'none'; icon.innerHTML = ""; }, 600);
             }, 800);
-        }, 800);
+
+        } catch (e) {
+            icon.innerHTML = "";
+            mainText.innerText = "보안 확인: 픽스 모드로 전환";
+            mainText.style.color = "#FF4D4D";
+            subText.innerText = "Security Verified: Switching to Fixed Mode";
+            
+            setTimeout(() => {
+                let data = [];
+                const localData = localStorage.getItem(`MANUAL_DATA_${prod}`);
+                if (localData) {
+                    data = JSON.parse(localData);
+                    document.getElementById('data-mode').innerText = "MEMORY MODE";
+                } else {
+                    try {
+                        if (prod === 'SM') data = (typeof data_sm !== 'undefined') ? data_sm : [];
+                        if (prod === 'AN') data = (typeof data_an !== 'undefined') ? data_an : [];
+                        if (prod === 'BD') data = (typeof data_bd !== 'undefined') ? data_bd : [];
+                        document.getElementById('data-mode').innerText = "FIXED MODE";
+                    } catch(err) { console.error(err); }
+                }
+                document.getElementById('data-mode').style.background = "#E74C3C";
+                renderEverything(data, prod);
+                setTimeout(() => {
+                    overlay.style.opacity = '0';
+                    setTimeout(() => { overlay.style.display = 'none'; mainText.style.color = "white"; }, 500);
+                }, 800);
+            }, 800);
+        }
     }
 
     function renderEverything(data, prodName) {
@@ -252,8 +274,7 @@
         document.getElementById('future-risk-list').innerHTML = '';
         document.getElementById('region-list').innerHTML = '';
 
-        // 사진 2번의 NaN 에러 방지 (cite: 2)
-        if (!Array.isArray(data) || data.length === 0) {
+        if (!data || data.length === 0) {
             document.getElementById('global-val').innerText = "0";
             document.getElementById('total-sites').innerText = "0";
             document.getElementById('cur-ratio').innerText = "0.00%";
@@ -290,10 +311,9 @@
                     })
                 }).addTo(map);
             } else {
-                const regionStyles = { "NEA": "#5DADE2", "SEA": "#48C9B0", "NA": "#52BE80", "WE": "#AF7AC5" };
-                const fillColor = regionStyles[p.region] || "#BDC3C7";
+                const regionMap = { "NEA": "#5DADE2", "SEA": "#48C9B0", "NA": "#52BE80", "WE": "#AF7AC5" };
                 marker = L.circleMarker([p.lat, p.lng], {
-                    radius: baseSize, fillColor: fillColor, color: "#333", weight: 1.5, fillOpacity: 0.85, stroke: true
+                    radius: baseSize, fillColor: regionMap[p.region] || "#BDC3C7", color: "#333", weight: 1.5, fillOpacity: 0.85, stroke: true
                 }).addTo(map);
             }
             marker.bindPopup(`<b>${p.company}</b><br>Capa: ${capa}K<br>Status: ${status}`);
@@ -319,10 +339,8 @@
             regions[p.region].sumLng += p.lng;
         });
 
-        const curRatio = globalTotalCapa > 0 ? ((curLoss / globalTotalCapa) * 100).toFixed(2) : "0.00";
-        const futRatio = globalTotalCapa > 0 ? ((futLoss / globalTotalCapa) * 100).toFixed(2) : "0.00";
-        document.getElementById('cur-ratio').innerText = curRatio + "%";
-        document.getElementById('fut-ratio').innerText = futRatio + "%";
+        document.getElementById('cur-ratio').innerText = globalTotalCapa > 0 ? ((curLoss / globalTotalCapa) * 100).toFixed(2) + "%" : "0.00%";
+        document.getElementById('fut-ratio').innerText = globalTotalCapa > 0 ? ((futLoss / globalTotalCapa) * 100).toFixed(2) + "%" : "0.00%";
         document.getElementById('cur-sum-h').innerText = curLoss.toFixed(1) + "K Loss ▼";
         document.getElementById('fut-sum-h').innerText = futLoss.toFixed(1) + "K Loss ▼";
 
@@ -330,7 +348,7 @@
             const rShare = globalTotalCapa > 0 ? ((r.totalCapa / globalTotalCapa) * 100).toFixed(1) : 0;
             const rDiv = document.createElement('div');
             rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${r.sumLat/r.totalPlants}, ${r.sumLng/r.totalPlants}, 4);">
-                                <span>${r.name} (${r.totalPlants})<span class="header-stats">${Math.round(r.totalCapa).toLocaleString()}K (${rShare}%)</span></span><span>▼</span></div>`;
+                                <span>${r.name} (${r.totalPlants})<span class="header-stats" style="color:#C0392B;">${Math.round(r.totalCapa).toLocaleString()}K (${rShare}%)</span></span><span>▼</span></div>`;
             document.getElementById('region-list').appendChild(rDiv);
         });
     }
