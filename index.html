@@ -10,9 +10,9 @@
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
         #map { flex-grow: 1; height: 100%; background: #DAEAF1; z-index: 1; }
         
-        /* 마커 움직임 부드럽게 처리 */
-        .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-zoom-animated {
-            transition: transform 0.25s cubic-bezier(0,0,0.2,1), width 0.25s, height 0.25s;
+        /* 마커 움직임 부드럽게 최적화 */
+        .leaflet-marker-icon, .leaflet-zoom-animated {
+            transition: transform 0.3s cubic-bezier(0,0,0.2,1), width 0.3s, height 0.3s;
         }
 
         #sidebar { position: absolute; left: 0; top: 0; width: 360px; height: 100%; background: white; z-index: 2000; transition: transform 0.4s ease; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
@@ -23,10 +23,22 @@
         .tab-btn { flex: 1; padding: 12px 2px; border: none; background: rgba(255,255,255,0.1); color: white; cursor: pointer; font-weight: bold; font-size: 0.75rem; border-radius: 4px; }
         .tab-btn.active { background: var(--accent); color: white; }
         
-        .header { background: var(--primary); color: white; padding: 18px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        /* 제작자 문구: 노란색, 30% 크게 */
-        .created-by { font-size: 0.85rem; color: #FFD700; font-weight: 900; margin-bottom: 8px; display: block; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+        .header { background: var(--primary); color: white; padding: 20px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        /* 제작자 문구: 노란색, 크기 30% 업그레이드 */
+        .created-by { font-size: 1.1rem; color: #FFD700; font-weight: 900; margin-bottom: 10px; display: block; text-shadow: 1px 1px 3px rgba(0,0,0,0.6); letter-spacing: 0.5px; }
         
+        /* 타이틀 홈 버튼 스타일 */
+        #prod-title { 
+            margin: 0; 
+            font-size: 1.2rem; 
+            letter-spacing: -0.5px; 
+            cursor: pointer; 
+            display: inline-block;
+            transition: 0.2s;
+        }
+        #prod-title:hover { color: #FFD700; transform: scale(1.02); }
+        #prod-title:active { transform: scale(0.98); }
+
         .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; background: var(--accent); color: white; gap: 1px; border-top: 1px solid rgba(255,255,255,0.2); }
         .metric-box { padding: 10px; background: var(--accent); text-align: center; }
         .metric-label { font-size: 0.55rem; opacity: 0.9; display: block; margin-bottom: 2px; }
@@ -35,7 +47,7 @@
         #list-container { flex-grow: 1; overflow-y: auto; background: var(--bg); }
         .group-header { padding: 12px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.8rem; align-items: center; }
         .risk-header-current { background: var(--current); color: white; }
-        .risk-header-future { background: var(--future); color: white; }
+        .risk-header-future { background: #D35400; color: white; }
         .region-header { background: #cbdceb; color: var(--primary); margin-top: 2px; }
         .country-header { background: #e8eff5; font-size: 0.7rem; padding-left: 20px; }
         
@@ -49,8 +61,8 @@
         .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 1px 6px; border-radius: 10px; font-size: 0.6rem; position: absolute; right: 10px; top: 10px; }
         #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; background: rgba(0,0,0,0.85); color: white; padding: 25px; border-radius: 15px; display: none; text-align: center; }
 
-        /* 세모 마커용 스타일 (입체감 효과 추가) */
-        .custom-triangle svg { filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.3)); transition: all 0.2s ease; }
+        /* 세모 마커용 스타일 */
+        .custom-triangle svg { filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.3)); }
     </style>
 </head>
 <body>
@@ -67,7 +79,7 @@
         </div>
         <div class="header">
             <span class="created-by">CREATED BY JS KIM OF LAM</span>
-            <h1 id="prod-title" style="margin:0; font-size:1.1rem; letter-spacing:-0.5px;">Global Supply Control Map</h1>
+            <h1 id="prod-title" onclick="resetMap()" title="Click to Reset View">Global Supply Control Map</h1>
         </div>
         
         <div class="metrics-grid">
@@ -121,7 +133,11 @@
 
     let activeMarkers = [];
 
-    // 지역별 세련된 파스텔톤 컬러 (입체감용)
+    // 지도 초기화 함수
+    function resetMap() {
+        map.flyTo([20, 100], 3, { duration: 1.5 });
+    }
+
     const regionColors = {
         "NEA": "#5DADE2", "SEA": "#48C9B0", "NA": "#52BE80", "WE": "#AF7AC5", 
         "CE": "#9B59B6", "CIS": "#EB984E", "ME": "#EC7063", "AFRICA": "#A04000", 
@@ -152,12 +168,11 @@
             const response = await fetch(sheetURLs[prod] + "&t=" + new Date().getTime());
             const csvText = await response.text();
             const data = parseCSV(csvText);
-            
             document.getElementById('btn-' + prod).innerText = `${prod} (${data.length})`;
             renderEverything(data, prod);
         } catch (e) {
             console.error(e);
-            alert("연동 실패. 시트 게시 상태를 확인하세요.");
+            alert("연동 실패.");
         } finally {
             document.getElementById('loading').style.display = 'none';
         }
@@ -168,10 +183,9 @@
         const color = isCur ? '#1A1A1B' : (isFut ? '#D35400' : null);
         
         if (isCur || isFut) {
-            // 세모 마커 (SVG)
             const iconSize = baseSize * 2.2;
             return L.divIcon({
-                html: `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" style="display:block;">
+                html: `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24">
                          <path d="M12 2L2 22H22L12 2Z" fill="${color}"/>
                        </svg>`,
                 className: 'custom-triangle',
@@ -179,7 +193,7 @@
                 iconAnchor: [iconSize / 2, iconSize / 2]
             });
         }
-        return null; // 정상은 circleMarker 사용
+        return null;
     }
 
     function renderEverything(data, prodName) {
@@ -205,7 +219,6 @@
             if(isCur) curLoss += parseFloat(loss);
             if(isFut) futLoss += parseFloat(loss);
 
-            // 마커 생성
             let marker;
             const icon = createPlantIcon(p, isCur, isFut);
             if (icon) {
@@ -243,7 +256,6 @@
             regions[reg].totalPlants++;
         });
 
-        // 로스율 계산
         const curRatio = ((curLoss / globalTotalCapa) * 100).toFixed(2);
         const futRatio = ((futLoss / globalTotalCapa) * 100).toFixed(2);
         document.getElementById('cur-ratio').innerText = curRatio + "%";
@@ -251,12 +263,9 @@
         document.getElementById('cur-sum-h').innerText = curLoss.toFixed(1) + "K Loss";
         document.getElementById('fut-sum-h').innerText = futLoss.toFixed(1) + "K Loss";
 
-        // 지역별 정렬 및 리스트 생성
         Object.values(regions).sort((a,b) => b.totalPlants - a.totalPlants).forEach(r => {
             const rDiv = document.createElement('div');
-            rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open')">
-                                <span>${r.name} (${r.totalPlants})</span><span>▾</span>
-                              </div>`;
+            rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open')"><span>${r.name} (${r.totalPlants})</span><span>▾</span></div>`;
             const rCont = document.createElement('div'); rCont.className = 'collapsible-content';
             Object.keys(r.countries).sort().forEach(c => {
                 const cDiv = document.createElement('div');
