@@ -10,7 +10,6 @@
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
         #map { flex-grow: 1; height: 100%; background: #DAEAF1; z-index: 1; }
         
-        /* 마커 고정 엔진 */
         .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-popup { 
             -webkit-backface-visibility: hidden; backface-visibility: hidden;
             will-change: transform; transition: none !important; 
@@ -99,17 +98,9 @@
     };
 
     const regionStyles = {
-        "NEA": { fill: "#5DADE2", border: "#2E86C1", coord: [35, 125] },
-        "SEA": { fill: "#48C9B0", border: "#16A085", coord: [10, 110] },
-        "NA": { fill: "#52BE80", border: "#1E8449", coord: [40, -100] },
-        "WE": { fill: "#AF7AC5", border: "#7D3C98", coord: [50, 5] },
-        "CE": { fill: "#9B59B6", border: "#6C3483", coord: [50, 20] },
-        "CIS": { fill: "#EB984E", border: "#A04000", coord: [55, 60] },
-        "ME": { fill: "#EC7063", border: "#B03A2E", coord: [25, 45] },
-        "AFRICA": { fill: "#A04000", border: "#5D2300", coord: [0, 20] },
-        "SA": { fill: "#58D68D", border: "#239B56", coord: [-15, -60] },
-        "IND": { fill: "#F4D03F", border: "#B7950B", coord: [20, 77] },
-        "Other": { fill: "#BDC3C7", border: "#7F8C8D", coord: [20, 100] }
+        "NEA": { fill: "#5DADE2", border: "#2E86C1" }, "SEA": { fill: "#48C9B0", border: "#16A085" }, "NA": { fill: "#52BE80", border: "#1E8449" }, "WE": { fill: "#AF7AC5", border: "#7D3C98" },
+        "CE": { fill: "#9B59B6", border: "#6C3483" }, "CIS": { fill: "#EB984E", border: "#A04000" }, "ME": { fill: "#EC7063", border: "#B03A2E" }, "AFRICA": { fill: "#A04000", border: "#5D2300" },
+        "SA": { fill: "#58D68D", border: "#239B56" }, "IND": { fill: "#F4D03F", border: "#B7950B" }, "Other": { fill: "#BDC3C7", border: "#7F8C8D" }
     };
 
     const map = L.map('map', {zoomControl: false, zoomAnimation: true, markerZoomAnimation: false}).setView([20, 100], 3);
@@ -117,7 +108,6 @@
 
     let activeMarkers = [];
 
-    // 공통 이동 함수 (줌 레벨 제어 가능)
     function flyToTarget(lat, lng, zoom, marker = null) {
         const offset = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360;
         const targetPoint = map.project([lat, lng], zoom).subtract([offset / 2, 0]);
@@ -173,8 +163,9 @@
         data.forEach(p => {
             if(!p.lat || !p.lng) return;
             const capa = p.capacity || 0;
-            const isCur = p.status && p.status.includes('Current');
-            const isFut = p.status && p.status.includes('Future');
+            const status = p.status || "Normal";
+            const isCur = status.includes('Current');
+            const isFut = status.includes('Future');
             const loss = ((capa / 365) * (p.days || 0)).toFixed(1);
             
             if(isCur) curLoss += parseFloat(loss);
@@ -198,17 +189,17 @@
                 }).addTo(map);
             }
             
-            marker.bindPopup(`<b>${p.company}</b><br>Capa: ${capa}K<br>Status: ${p.status}`);
+            marker.bindPopup(`<b>${p.company}</b><br>Capa: ${p.capacity}K<br>Status: ${p.status}`);
             marker.on('click', (e) => { L.DomEvent.stopPropagation(e); flyToTarget(p.lat, p.lng, 7, marker); });
             activeMarkers.push(marker);
             p._m = marker;
 
             const createCard = (showShare = true) => {
-                const share = ((capa / globalTotalCapa) * 100).toFixed(1);
+                const share = ((p.capacity / globalTotalCapa) * 100).toFixed(1);
                 const card = document.createElement('div');
                 card.className = `plant-card ${isCur?'current-risk':(isFut?'future-risk':'')}`;
-                card.innerHTML = `${(isCur||isFut) ? `<span class="loss-badge">${loss}K Loss</span>` : ''}<b>${p.company}</b>${showShare ? `<span class="share-tag">(${share}%)</span>` : ''}<div class="capa-info">${capa}K MT | ${p.status}</div>`;
-                card.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); };
+                card.innerHTML = `${(isCur||isFut) ? `<span class="loss-badge">${loss}K Loss</span>` : ''}<b>${p.company}</b>${showShare ? `<span class="share-tag">(${share}%)</span>` : ''}<div class="capa-info">${p.capacity}K MT | ${p.status}</div>`;
+                card.onclick = () => flyToTarget(p.lat, p.lng, 7, p._m);
                 return card;
             };
 
@@ -217,40 +208,47 @@
 
             const reg = p.region || "Unknown";
             const cou = p.country || "Other";
-            if (!regions[reg]) regions[reg] = { name: reg, countries: {}, totalPlants: 0, totalCapa: 0 };
-            if (!regions[reg].countries[cou]) regions[reg].countries[cou] = { plants: [], countryCapa: 0 };
+            if (!regions[reg]) regions[reg] = { name: reg, countries: {}, totalPlants: 0, totalCapa: 0, sumLat: 0, sumLng: 0 };
+            if (!regions[reg].countries[cou]) regions[reg].countries[cou] = { plants: [], countryCapa: 0, sumLat: 0, sumLng: 0 };
             
             regions[reg].countries[cou].plants.push(createCard(true));
             regions[reg].countries[cou].countryCapa += capa;
+            regions[reg].countries[cou].sumLat += p.lat;
+            regions[reg].countries[cou].sumLng += p.lng;
+            
             regions[reg].totalPlants++;
             regions[reg].totalCapa += capa;
+            regions[reg].sumLat += p.lat;
+            regions[reg].sumLng += p.lng;
         });
 
-        document.getElementById('cur-ratio').innerText = globalTotalCapa > 0 ? ((curLoss / globalTotalCapa) * 100).toFixed(2) + "%" : "0%";
-        document.getElementById('fut-ratio').innerText = globalTotalCapa > 0 ? ((futLoss / globalTotalCapa) * 100).toFixed(2) + "%" : "0%";
         document.getElementById('cur-sum-h').innerText = curLoss.toFixed(1) + "K Loss ▼";
         document.getElementById('fut-sum-h').innerText = futLoss.toFixed(1) + "K Loss ▼";
+        document.getElementById('cur-ratio').innerText = globalTotalCapa > 0 ? ((curLoss / globalTotalCapa) * 100).toFixed(2) + "%" : "0%";
+        document.getElementById('fut-ratio').innerText = globalTotalCapa > 0 ? ((futLoss / globalTotalCapa) * 100).toFixed(2) + "%" : "0%";
 
-        // 지역별 렌더링
         Object.values(regions).sort((a,b) => b.totalPlants - a.totalPlants).forEach(r => {
             const rShare = ((r.totalCapa / globalTotalCapa) * 100).toFixed(1);
+            const avgLat = r.sumLat / r.totalPlants;
+            const avgLng = r.sumLng / r.totalPlants;
+            
             const rDiv = document.createElement('div');
-            
-            // ★ 지역 헤더 클릭 시 해당 대륙으로 이동 (줌 레벨 4.5로 50% 축소 조망) ★
-            const regInfo = regionStyles[Object.keys(regionStyles).find(k => r.name.includes(k))] || regionStyles.Other;
-            
-            rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${regInfo.coord[0]}, ${regInfo.coord[1]}, 4.5);">
+            // 지역 클릭 시 줌 4로 이동 (공장들 중앙점 계산)
+            rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${avgLat}, ${avgLng}, 4);">
                                 <span>${r.name} (${r.totalPlants})
                                 <span class="header-stats" style="color:#C0392B;">${Math.round(r.totalCapa).toLocaleString()}K (${rShare}%)</span></span>
                                 <span>▼</span></div><div class="collapsible-content"></div>`;
-            
             const rCont = rDiv.querySelector('.collapsible-content');
 
             Object.keys(r.countries).sort().forEach(c => {
                 const cData = r.countries[c];
                 const cShare = ((cData.countryCapa / globalTotalCapa) * 100).toFixed(1);
+                const cAvgLat = cData.sumLat / cData.plants.length;
+                const cAvgLng = cData.sumLng / cData.plants.length;
+                
                 const cDiv = document.createElement('div');
-                cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open')">
+                // ★ 국가 클릭 시 줌 5.5로 이동 추가 ★
+                cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${cAvgLat}, ${cAvgLng}, 5.5);">
                                     <span>${c} (${cData.plants.length})
                                     <span class="header-stats" style="font-size:0.8rem; color:#1597BB;">${Math.round(cData.countryCapa).toLocaleString()}K (${cShare}%)</span></span>
                                     <span>▼</span></div><div class="collapsible-content"></div>`;
