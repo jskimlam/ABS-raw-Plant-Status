@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v9.1 Security)</title>
+    <title>Global Supply Control Tower | JS KIM (v9.2 Security)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <script src="data/data_sm.js"></script>
@@ -48,13 +48,17 @@
         .plant-card { padding: 10px 12px 10px 30px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.72rem; background: white; position: relative; }
         .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 2px 6px; border-radius: 10px; font-size: 0.6rem; position: absolute; right: 10px; top: 10px; }
         
+        /* 암호 입력창 포함 모달 스타일 강화 */
         #update-modal {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 420px; background: white; z-index: 11000; padding: 25px;
-            box-shadow: 0 0 50px rgba(0,0,0,0.5); border-radius: 20px; display: none;
+            box-shadow: 0 0 60px rgba(0,0,0,0.6); border-radius: 20px; display: none;
         }
         #update-modal textarea { width: 100%; height: 200px; margin: 10px 0; font-size: 0.75rem; border: 1px solid #ddd; border-radius: 5px; padding: 8px; box-sizing: border-box; }
-        #admin-password { width: 100%; padding: 10px; margin-bottom: 10px; border: 2px solid var(--primary); border-radius: 5px; box-sizing: border-box; font-weight: bold; }
+        #admin-password { width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid var(--primary); border-radius: 8px; box-sizing: border-box; font-weight: bold; font-size: 1rem; text-align: center; }
+
+        /* 데이터 입력 영역 숨김 처리 */
+        #data-input-section { display: none; border-top: 2px dashed #eee; padding-top: 15px; margin-top: 10px; }
 
         #sync-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -71,18 +75,25 @@
 <body>
 
 <div id="update-modal">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-        <h3 style="margin:0; color:var(--primary);">🔒 Admin Control Center</h3>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="margin:0; color:var(--primary);">🔒 Admin Verification</h3>
         <span style="font-size: 0.7rem; color: #999;">JS KIM OF LAM</span>
     </div>
-    <label style="font-size:0.8rem; font-weight:bold;">Admin Password</label>
-    <input type="password" id="admin-password" placeholder="관리자 암호를 입력하세요">
+
+    <div id="auth-section">
+        <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:8px;">관리자 암호를 입력하십시오</label>
+        <input type="password" id="admin-password" placeholder="Enter Admin Password">
+        <button style="background:var(--primary); color:white; padding:12px; width:100%; border:none; border-radius:8px; cursor:pointer; font-weight:900;" onclick="verifyAdmin()">보안 인증 확인</button>
+    </div>
     
-    <label style="font-size:0.8rem; font-weight:bold;">CSV Data Paste</label>
-    <textarea id="csv-input" placeholder="구글 시트 전체 복사 후 여기에 붙여넣기"></textarea>
-    
-    <button style="background:var(--primary); color:white; padding:15px; width:100%; border:none; border-radius:10px; cursor:pointer; font-weight:900; font-size:1rem; margin-top:5px;" onclick="saveManualData()">보안 메모리에 즉시 저장</button>
-    <button style="width:100%; margin-top:10px; border:none; padding:10px; border-radius:8px; cursor:pointer; background:#f5f5f5; color:#666;" onclick="document.getElementById('update-modal').style.display='none'">닫기</button>
+    <div id="data-input-section">
+        <label style="font-size:0.85rem; font-weight:bold; display:block;">CSV 데이터 붙여넣기</label>
+        <small style="color:#2ECC71; font-weight:bold;">인증 완료 - 데이터를 입력할 수 있습니다.</small>
+        <textarea id="csv-input" placeholder="구글 시트 전체 복사(Ctrl+A, Ctrl+C) 후 여기에 붙여넣기(Ctrl+V)"></textarea>
+        <button style="background:#27ae60; color:white; padding:15px; width:100%; border:none; border-radius:10px; cursor:pointer; font-weight:900; font-size:1rem;" onclick="saveManualData()">보안 메모리에 저장</button>
+    </div>
+
+    <button style="width:100%; margin-top:15px; border:none; padding:10px; border-radius:8px; cursor:pointer; background:#f5f5f5; color:#666;" onclick="closeModal()">취소 및 닫기</button>
 </div>
 
 <div id="sync-overlay">
@@ -131,7 +142,7 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // ★ 관리자 암호 변경: jskim0111 ★
+    // ★ 관리자 암호: jskim0111 ★
     const ADMIN_PASS = "jskim0111"; 
 
     const SHEET_URLS = {
@@ -146,30 +157,37 @@
 
     let activeMarkers = [];
 
+    // 모달 제어 함수
     function showUpdateModal() { 
         document.getElementById('admin-password').value = ""; 
+        document.getElementById('auth-section').style.display = 'block';
+        document.getElementById('data-input-section').style.display = 'none';
         document.getElementById('update-modal').style.display = 'block'; 
     }
 
-    function saveManualData() {
+    function closeModal() { document.getElementById('update-modal').style.display = 'none'; }
+
+    // ★ 1단계: 암호 인증 로직 ★
+    function verifyAdmin() {
         const pwInput = document.getElementById('admin-password').value;
+        if (pwInput === ADMIN_PASS) {
+            document.getElementById('auth-section').style.display = 'none';
+            document.getElementById('data-input-section').style.display = 'block';
+        } else {
+            alert("❌ 보안 경고: 관리자 암호가 일치하지 않습니다. 접근이 거부되었습니다.");
+        }
+    }
+
+    // ★ 2단계: 데이터 저장 로직 ★
+    function saveManualData() {
         const csvInput = document.getElementById('csv-input').value;
-
-        if (pwInput !== ADMIN_PASS) {
-            alert("❌ 보안 경고: 관리자 암호가 일치하지 않습니다.");
-            return;
-        }
-
-        if (!csvInput) {
-            alert("데이터를 입력해주세요.");
-            return;
-        }
+        if (!csvInput) { alert("데이터를 입력해주세요."); return; }
 
         const parsed = parseCSV(csvInput);
         if(parsed.length > 0) {
             localStorage.setItem(`MANUAL_DATA_${currentProd}`, JSON.stringify(parsed));
             alert(`✅ 보안 검증 완료: ${currentProd} 데이터가 사장님 전용 메모리에 저장되었습니다.`);
-            document.getElementById('update-modal').style.display = 'none';
+            closeModal();
             renderEverything(parsed, currentProd);
         } else {
             alert("데이터 형식이 올바르지 않습니다.");
