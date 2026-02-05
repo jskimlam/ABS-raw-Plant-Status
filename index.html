@@ -10,10 +10,8 @@
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
         #map { flex-grow: 1; height: 100%; background: #DAEAF1; z-index: 1; }
         
-        /* ★ 줌 애니메이션 부드럽게 만들기 (핵심) ★ */
-        .leaflet-marker-icon, 
-        .leaflet-marker-shadow, 
-        .leaflet-zoom-animated {
+        /* 줌 애니메이션 최적화 */
+        .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-zoom-animated {
             transition: transform 0.25s cubic-bezier(0.42, 0, 0.58, 1), 
                         width 0.25s cubic-bezier(0.42, 0, 0.58, 1), 
                         height 0.25s cubic-bezier(0.42, 0, 0.58, 1) !important;
@@ -29,7 +27,6 @@
         .tab-btn.active { background: var(--accent); color: white; }
         
         .header { background: var(--primary); color: white; padding: 20px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        /* 제작자 문구: 노란색, 크기 30% 크게 */
         .created-by { font-size: 1.15rem; color: #FFD700; font-weight: 900; margin-bottom: 10px; display: block; text-shadow: 1px 1px 3px rgba(0,0,0,0.6); letter-spacing: 0.5px; }
         
         #prod-title { margin: 0; font-size: 1.2rem; letter-spacing: -0.5px; cursor: pointer; display: inline-block; transition: 0.2s; }
@@ -73,7 +70,7 @@
         </div>
         <div class="header">
             <span class="created-by">CREATED BY JS KIM OF LAM</span>
-            <h1 id="prod-title" onclick="resetMap()" title="지도를 초기 뷰로 리셋">Global Supply Control Map</h1>
+            <h1 id="prod-title" onclick="resetMap()" title="전체 지도로 리셋">Global Supply Control Map</h1>
         </div>
         
         <div class="metrics-grid">
@@ -160,12 +157,13 @@
             const data = parseCSV(csvText);
             document.getElementById('btn-' + prod).innerText = `${prod} (${data.length})`;
             renderEverything(data, prod);
-        } catch (e) { alert("연동 실패."); }
+        } catch (e) { console.error(e); }
         finally { document.getElementById('loading').style.display = 'none'; }
     }
 
     function createPlantIcon(p, isCur, isFut) {
-        const baseSize = Math.sqrt(p.capacity) * 0.8;
+        // ★ 마커 크기 30% 축소 계수 (0.8 -> 0.55)
+        const baseSize = Math.sqrt(p.capacity) * 0.55; 
         const color = isCur ? '#1A1A1B' : (isFut ? '#D35400' : null);
         if (isCur || isFut) {
             const iconSize = baseSize * 2.2;
@@ -204,15 +202,23 @@
 
             let marker;
             const icon = createPlantIcon(p, isCur, isFut);
-            if (icon) marker = L.marker([p.lat, p.lng], { icon: icon }).addTo(map);
-            else {
+            if (icon) {
+                marker = L.marker([p.lat, p.lng], { icon: icon }).addTo(map);
+            } else {
                 const regKey = Object.keys(regionColors).find(k => p.region && p.region.includes(k)) || "Other";
                 marker = L.circleMarker([p.lat, p.lng], {
-                    radius: Math.sqrt(p.capacity) * 0.8,
+                    radius: Math.sqrt(p.capacity) * 0.55, // ★ 마커 크기 30% 축소
                     fillColor: regionColors[regKey], color: 'none', stroke: false, fillOpacity: 0.85
                 }).addTo(map);
             }
+            
             marker.bindPopup(`<b>${p.company}</b><br>${p.location}<br>Capa: ${p.capacity}K (${share}%)<br>Status: ${p.status}`);
+            
+            // ★ 마커 클릭 시 지도 확대 기능 추가
+            marker.on('click', function(e) {
+                map.flyTo(e.latlng, 8, { duration: 1.0 });
+            });
+
             activeMarkers.push(marker);
 
             const createCard = (showShare = true) => {
