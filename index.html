@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v7.3)</title>
+    <title>Global Supply Control Tower | JS KIM (v7.4)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <script src="data/data_sm.js"></script>
@@ -15,7 +15,7 @@
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
         #map { flex-grow: 1; height: 100%; background: #DAEAF1; z-index: 1; }
         
-        /* 마커 고정 엔진 */
+        /* 마커 자석 효과 */
         .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-popup { 
             -webkit-backface-visibility: hidden; backface-visibility: hidden;
             will-change: transform; transition: none !important; 
@@ -50,7 +50,6 @@
         .plant-card { padding: 10px 12px 10px 30px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.72rem; background: white; position: relative; }
         .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 2px 6px; border-radius: 10px; font-size: 0.6rem; position: absolute; right: 10px; top: 10px; }
         
-        /* 보안 전환 오버레이 */
         #security-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(10, 38, 71, 0.98); z-index: 10000;
@@ -94,8 +93,8 @@
         <div class="metrics-grid">
             <div class="metric-box"><span class="metric-label">GLOBAL CAPA</span><span class="metric-value" id="global-val">0</span></div>
             <div class="metric-box"><span class="metric-label">TOTAL SITES</span><span class="metric-value" id="total-sites">0</span></div>
-            <div class="metric-box" style="background: #1A1A1B;"><span class="metric-label">CUR. LOSS %</span><span class="metric-value" id="cur-ratio" style="color:#FF4D4D">0%</span></div>
-            <div class="metric-box" style="background: #D35400;"><span class="metric-label">FUT. LOSS %</span><span class="metric-value" id="fut-ratio" style="color:#FFD700">0%</span></div>
+            <div class="metric-box" style="background: #1A1A1B;"><span class="metric-label">CUR. LOSS %</span><span class="metric-value" id="cur-ratio" style="color:#FF4D4D">0.00%</span></div>
+            <div class="metric-box" style="background: #D35400;"><span class="metric-label">FUT. LOSS %</span><span class="metric-value" id="fut-ratio" style="color:#FFD700">0.00%</span></div>
         </div>
 
         <div id="list-container">
@@ -183,11 +182,13 @@
         overlay.style.display = 'flex';
 
         setTimeout(() => {
-            // ★ 사진 분석 결과: JS 파일 내 실제 변수명(data_sm, data_an, data_bd) 적용 ★
+            // ★ 개선: const 변수에 직접 접근 및 대소문자 매핑 ★
             let data = [];
-            if (prod === 'SM') data = window.data_sm || [];
-            if (prod === 'AN') data = window.data_an || [];
-            if (prod === 'BD') data = window.data_bd || [];
+            try {
+                if (prod === 'SM') data = (typeof data_sm !== 'undefined') ? data_sm : [];
+                if (prod === 'AN') data = (typeof data_an !== 'undefined') ? data_an : [];
+                if (prod === 'BD') data = (typeof data_bd !== 'undefined') ? data_bd : [];
+            } catch(err) { console.error("Data load error", err); }
 
             document.getElementById('data-mode').innerText = "SECURITY MODE (FIXED)";
             document.getElementById('data-mode').style.color = "#E74C3C";
@@ -197,7 +198,7 @@
                 overlay.style.opacity = '0';
                 setTimeout(() => { overlay.style.display = 'none'; overlay.style.opacity = '1'; }, 500);
             }, 1500);
-        }, 1000);
+        }, 800);
     }
 
     function renderEverything(data, prodName) {
@@ -207,7 +208,15 @@
         document.getElementById('future-risk-list').innerHTML = '';
         document.getElementById('region-list').innerHTML = '';
 
-        const globalTotalCapa = data.reduce((s, p) => s + (p.capacity || 0), 0);
+        if (!data || data.length === 0) {
+            document.getElementById('global-val').innerText = "0";
+            document.getElementById('total-sites').innerText = "0";
+            document.getElementById('cur-ratio').innerText = "0.00%";
+            document.getElementById('fut-ratio').innerText = "0.00%";
+            return;
+        }
+
+        const globalTotalCapa = data.reduce((s, p) => s + (parseFloat(p.capacity) || 0), 0);
         document.getElementById('global-val').innerText = Math.round(globalTotalCapa).toLocaleString();
         document.getElementById('total-sites').innerText = data.length;
 
@@ -215,20 +224,22 @@
         const regions = {};
 
         data.forEach(p => {
-            const lat = p.lat; const lng = p.lng;
-            if(!lat || !lng) return;
+            if(!p.lat || !p.lng) return;
             const status = p.status || "Normal";
+            const capa = parseFloat(p.capacity) || 0;
+            const days = parseFloat(p.days) || 0;
             const isCur = status.includes('Current');
             const isFut = status.includes('Future');
-            const loss = ((p.capacity / 365) * (p.days || 0)).toFixed(1);
+            const loss = ((capa / 365) * days).toFixed(1);
+            
             if(isCur) curLoss += parseFloat(loss);
             if(isFut) futLoss += parseFloat(loss);
 
-            const baseSize = Math.sqrt(p.capacity) * 0.55;
+            const baseSize = Math.sqrt(capa) * 0.55;
             let marker;
             if (isCur || isFut) {
                 const color = isCur ? '#1A1A1B' : '#D35400';
-                marker = L.marker([lat, lng], {
+                marker = L.marker([p.lat, p.lng], {
                     icon: L.divIcon({
                         html: `<svg width="${baseSize*2.2}" height="${baseSize*2.2}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="${color}" stroke="${isCur?'none':'#A04000'}" stroke-width="${isCur?0:2}"/></svg>`,
                         className: 'custom-triangle', iconSize: [baseSize*2.2, baseSize*2.2], iconAnchor: [baseSize*1.1, baseSize*1.1]
@@ -236,20 +247,20 @@
                 }).addTo(map);
             } else {
                 const regKey = Object.keys(regionStyles).find(k => (p.region || "").includes(k)) || "Other";
-                marker = L.circleMarker([lat, lng], {
+                marker = L.circleMarker([p.lat, p.lng], {
                     radius: baseSize, fillColor: regionStyles[regKey].fill, color: regionStyles[regKey].border, weight: 1.5, fillOpacity: 0.85, stroke: true
                 }).addTo(map);
             }
-            marker.bindPopup(`<b>${p.company}</b><br>Capa: ${p.capacity}K<br>Status: ${status}`);
-            marker.on('click', (e) => { L.DomEvent.stopPropagation(e); flyToTarget(lat, lng, 7, marker); });
+            marker.bindPopup(`<b>${p.company}</b><br>Capa: ${capa}K<br>Status: ${status}`);
+            marker.on('click', (e) => { L.DomEvent.stopPropagation(e); flyToTarget(p.lat, p.lng, 7, marker); });
             activeMarkers.push(marker); p._m = marker;
 
             const createCard = (showShare = true) => {
-                const share = globalTotalCapa > 0 ? ((p.capacity / globalTotalCapa) * 100).toFixed(1) : 0;
+                const share = globalTotalCapa > 0 ? ((capa / globalTotalCapa) * 100).toFixed(1) : 0;
                 const card = document.createElement('div');
                 card.className = 'plant-card';
-                card.innerHTML = `${(isCur||isFut)?`<span class="loss-badge">${loss}K Loss</span>`:''}<b>${p.company}</b>${showShare?`<span style="color:#1597BB; font-weight:bold; margin-left:5px;">(${share}%)</span>`:''}<div style="color:#666; font-size:0.65rem;">${p.capacity}K MT | ${status}</div>`;
-                card.onclick = () => flyToTarget(lat, lng, 7, p._m);
+                card.innerHTML = `${(isCur||isFut)?`<span class="loss-badge">${loss}K Loss</span>`:''}<b>${p.company}</b>${showShare?`<span style="color:#1597BB; font-weight:bold; margin-left:5px;">(${share}%)</span>`:''}<div style="color:#666; font-size:0.65rem;">${capa}K MT | ${status}</div>`;
+                card.onclick = () => flyToTarget(p.lat, p.lng, 7, p._m);
                 return card;
             };
 
@@ -259,29 +270,29 @@
             if (!regions[p.region]) regions[p.region] = { name: p.region, countries: {}, totalPlants: 0, totalCapa: 0, sumLat: 0, sumLng: 0 };
             if (!regions[p.region].countries[p.country]) regions[p.region].countries[p.country] = { plants: [], countryCapa: 0, sumLat: 0, sumLng: 0 };
             regions[p.region].countries[p.country].plants.push(createCard(true));
-            regions[p.region].countries[p.country].countryCapa += p.capacity;
-            regions[p.region].countries[p.country].sumLat += lat;
-            regions[p.region].countries[p.country].sumLng += lng;
+            regions[p.region].countries[p.country].countryCapa += capa;
+            regions[p.region].countries[p.country].sumLat += p.lat;
+            regions[p.region].countries[p.country].sumLng += p.lng;
             regions[p.region].totalPlants++;
-            regions[p.region].totalCapa += p.capacity;
-            regions[p.region].sumLat += lat;
-            regions[p.region].sumLng += lng;
+            regions[p.region].totalCapa += capa;
+            regions[p.region].sumLat += p.lat;
+            regions[p.region].sumLng += p.lng;
         });
 
         document.getElementById('cur-sum-h').innerText = curLoss.toFixed(1) + "K Loss ▼";
         document.getElementById('fut-sum-h').innerText = futLoss.toFixed(1) + "K Loss ▼";
-        document.getElementById('cur-ratio').innerText = ((curLoss / globalTotalCapa) * 100).toFixed(2) + "%";
-        document.getElementById('fut-ratio').innerText = ((futLoss / globalTotalCapa) * 100).toFixed(2) + "%";
+        document.getElementById('cur-ratio').innerText = globalTotalCapa > 0 ? ((curLoss / globalTotalCapa) * 100).toFixed(2) + "%" : "0.00%";
+        document.getElementById('fut-ratio').innerText = globalTotalCapa > 0 ? ((futLoss / globalTotalCapa) * 100).toFixed(2) + "%" : "0.00%";
 
         Object.values(regions).sort((a,b) => b.totalPlants - a.totalPlants).forEach(r => {
-            const rShare = ((r.totalCapa / globalTotalCapa) * 100).toFixed(1);
+            const rShare = globalTotalCapa > 0 ? ((r.totalCapa / globalTotalCapa) * 100).toFixed(1) : 0;
             const rDiv = document.createElement('div');
             rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${r.sumLat/r.totalPlants}, ${r.sumLng/r.totalPlants}, 4);">
                                 <span>${r.name} (${r.totalPlants})<span class="header-stats" style="color:#C0392B;">${Math.round(r.totalCapa).toLocaleString()}K (${rShare}%)</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
             const rCont = rDiv.querySelector('.collapsible-content');
             Object.keys(r.countries).sort().forEach(c => {
                 const cData = r.countries[c];
-                const cShare = ((cData.countryCapa / globalTotalCapa) * 100).toFixed(1);
+                const cShare = globalTotalCapa > 0 ? ((cData.countryCapa / globalTotalCapa) * 100).toFixed(1) : 0;
                 const cDiv = document.createElement('div');
                 cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${cData.sumLat/cData.plants.length}, ${cData.sumLng/cData.plants.length}, 5.5);">
                                     <span>${c} (${cData.plants.length})<span class="header-stats" style="font-size:0.8rem; color:#1597BB;">${Math.round(cData.countryCapa).toLocaleString()}K (${cShare}%)</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
