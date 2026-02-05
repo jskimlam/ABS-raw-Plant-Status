@@ -10,9 +10,14 @@
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
         #map { flex-grow: 1; height: 100%; background: #DAEAF1; z-index: 1; }
         
-        /* 마커 움직임 애니메이션 최적화 */
-        .leaflet-marker-icon, .leaflet-zoom-animated {
-            transition: transform 0.3s cubic-bezier(0,0,0.2,1), width 0.3s, height 0.3s;
+        /* ★ 줌 애니메이션 부드럽게 만들기 (핵심) ★ */
+        .leaflet-marker-icon, 
+        .leaflet-marker-shadow, 
+        .leaflet-zoom-animated {
+            transition: transform 0.25s cubic-bezier(0.42, 0, 0.58, 1), 
+                        width 0.25s cubic-bezier(0.42, 0, 0.58, 1), 
+                        height 0.25s cubic-bezier(0.42, 0, 0.58, 1) !important;
+            will-change: transform, width, height;
         }
 
         #sidebar { position: absolute; left: 0; top: 0; width: 360px; height: 100%; background: white; z-index: 2000; transition: transform 0.4s ease; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
@@ -24,11 +29,10 @@
         .tab-btn.active { background: var(--accent); color: white; }
         
         .header { background: var(--primary); color: white; padding: 20px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .created-by { font-size: 1.1rem; color: #FFD700; font-weight: 900; margin-bottom: 10px; display: block; text-shadow: 1px 1px 3px rgba(0,0,0,0.6); letter-spacing: 0.5px; }
+        /* 제작자 문구: 노란색, 크기 30% 크게 */
+        .created-by { font-size: 1.15rem; color: #FFD700; font-weight: 900; margin-bottom: 10px; display: block; text-shadow: 1px 1px 3px rgba(0,0,0,0.6); letter-spacing: 0.5px; }
         
-        #prod-title { 
-            margin: 0; font-size: 1.2rem; letter-spacing: -0.5px; cursor: pointer; display: inline-block; transition: 0.2s;
-        }
+        #prod-title { margin: 0; font-size: 1.2rem; letter-spacing: -0.5px; cursor: pointer; display: inline-block; transition: 0.2s; }
         #prod-title:hover { color: #FFD700; transform: scale(1.02); }
 
         .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; background: var(--accent); color: white; gap: 1px; border-top: 1px solid rgba(255,255,255,0.2); }
@@ -41,7 +45,6 @@
         .risk-header-current { background: var(--current); color: white; }
         .risk-header-future { background: #D35400; color: white; }
         .region-header { background: #cbdceb; color: var(--primary); margin-top: 2px; line-height: 1.3; }
-        .country-header { background: #e8eff5; font-size: 0.7rem; padding-left: 20px; }
         
         .collapsible-content { display: none; }
         .open > .collapsible-content { display: block; }
@@ -53,7 +56,7 @@
         .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 1px 6px; border-radius: 10px; font-size: 0.6rem; position: absolute; right: 10px; top: 10px; }
         #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; background: rgba(0,0,0,0.85); color: white; padding: 25px; border-radius: 15px; display: none; text-align: center; }
 
-        .custom-triangle svg { filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.3)); }
+        .custom-triangle svg { filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.3)); display: block; }
     </style>
 </head>
 <body>
@@ -70,7 +73,7 @@
         </div>
         <div class="header">
             <span class="created-by">CREATED BY JS KIM OF LAM</span>
-            <h1 id="prod-title" onclick="resetMap()" title="전체 지도로 리셋">Global Supply Control Map</h1>
+            <h1 id="prod-title" onclick="resetMap()" title="지도를 초기 뷰로 리셋">Global Supply Control Map</h1>
         </div>
         
         <div class="metrics-grid">
@@ -119,12 +122,12 @@
         'BD': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=607848019&single=true&output=csv'
     };
 
-    const map = L.map('map', {zoomControl: false}).setView([20, 100], 3);
+    const map = L.map('map', {zoomControl: false, zoomAnimation: true}).setView([20, 100], 3);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
 
     let activeMarkers = [];
 
-    function resetMap() { map.flyTo([20, 100], 3, { duration: 1.5 }); }
+    function resetMap() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
 
     const regionColors = {
         "NEA": "#5DADE2", "SEA": "#48C9B0", "NA": "#52BE80", "WE": "#AF7AC5", 
@@ -157,7 +160,7 @@
             const data = parseCSV(csvText);
             document.getElementById('btn-' + prod).innerText = `${prod} (${data.length})`;
             renderEverything(data, prod);
-        } catch (e) { console.error(e); alert("데이터 로드 실패."); }
+        } catch (e) { alert("연동 실패."); }
         finally { document.getElementById('loading').style.display = 'none'; }
     }
 
@@ -167,7 +170,8 @@
         if (isCur || isFut) {
             const iconSize = baseSize * 2.2;
             return L.divIcon({
-                html: `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="${color}"/></svg>`,
+                html: `<svg width="100%" height="100%" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet">
+                         <path d="M12 2L2 22H22L12 2Z" fill="${color}"/></svg>`,
                 className: 'custom-triangle',
                 iconSize: [iconSize, iconSize], iconAnchor: [iconSize / 2, iconSize / 2]
             });
