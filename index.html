@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Chemical Dashboard | SM·AN·BD Integrated BI</title>
+    <title>Global Chemical BI Dashboard | Live Sync</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --primary: #0A2647; --accent: #1597BB; --current: #1A1A1B; --future: #F1C40F; --bg: #F0F5F9; }
@@ -10,26 +10,23 @@
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
         #map { flex-grow: 1; height: 100%; background: #DAEAF1; z-index: 1; }
         
-        /* Sidebar Design (320px Fixed) */
-        #sidebar { position: absolute; left: 0; top: 0; width: 320px; height: 100%; background: white; z-index: 2000; transition: transform 0.5s ease; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+        /* Sidebar Styles */
+        #sidebar { position: absolute; left: 0; top: 0; width: 320px; height: 100%; background: white; z-index: 2000; transition: transform 0.4s ease; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
         #sidebar.hidden { transform: translateX(-100%); }
         #toggle-btn { position: absolute; right: -45px; top: 20px; width: 45px; height: 45px; background: var(--primary); color: white; border: none; cursor: pointer; border-radius: 0 8px 8px 0; font-size: 18px; z-index: 2001; }
         
-        /* Product Selector Tabs */
         .product-tabs { display: flex; background: #051937; padding: 5px; gap: 4px; }
-        .tab-btn { flex: 1; padding: 12px 5px; border: none; background: rgba(255,255,255,0.1); color: white; cursor: pointer; font-weight: bold; font-size: 0.75rem; border-radius: 4px; transition: 0.3s; }
-        .tab-btn.active { background: var(--accent); }
+        .tab-btn { flex: 1; padding: 12px 5px; border: none; background: rgba(255,255,255,0.1); color: white; cursor: pointer; font-weight: bold; font-size: 0.75rem; border-radius: 4px; transition: 0.2s; }
+        .tab-btn.active { background: var(--accent); box-shadow: inset 0 -3px 0 white; }
         
-        .header { background: var(--primary); color: white; padding: 15px; cursor: pointer; }
-        .global-cap { background: var(--accent); padding: 12px 15px; color: white; border-bottom: 2px solid rgba(0,0,0,0.1); cursor: pointer; transition: 0.2s; }
-        .global-cap:hover { background: #1aaccf; }
+        .header { background: var(--primary); color: white; padding: 15px; }
+        .global-cap { background: var(--accent); padding: 12px 15px; color: white; border-bottom: 3px solid rgba(0,0,0,0.1); }
         
         #list-container { flex-grow: 1; overflow-y: auto; background: var(--bg); }
-        .group-header { padding: 10px 12px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.8rem; }
+        .group-header { padding: 10px 12px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.8rem; align-items: center; }
         .risk-header-current { background: var(--current); color: white; }
         .risk-header-future { background: var(--future); color: #333; }
         .region-header { background: #cbdceb; color: var(--primary); }
-        .country-header { background: #eef2f5; color: #444; padding-left: 20px; font-size: 0.78rem; }
         
         .collapsible-content { display: none; }
         .open > .collapsible-content { display: block; }
@@ -39,177 +36,144 @@
         .plant-card.current-risk { border-left: 5px solid var(--current); }
         .plant-card.future-risk { border-left: 5px solid var(--future); }
         
-        .badge { font-size: 0.6rem; padding: 2px 4px; border-radius: 3px; color: white; background: var(--accent); float: right; margin-left: 5px; }
-        .badge.black { background: var(--current); }
-        .badge.yellow { background: var(--future); color: #333; }
-        .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 1px 5px; border-radius: 10px; font-size: 0.6rem; position: absolute; right: 10px; top: 8px; }
-        .share-badge { background: #555; color: white; padding: 1px 4px; border-radius: 4px; font-size: 0.55rem; position: absolute; right: 10px; bottom: 8px; }
-        .capa-info { color: #666; font-size: 0.62rem; margin-top: 2px; }
+        .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 1px 6px; border-radius: 10px; font-size: 0.6rem; position: absolute; right: 10px; top: 8px; }
+        #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; background: rgba(0,0,0,0.85); color: white; padding: 25px 40px; border-radius: 15px; display: none; text-align: center; }
     </style>
 </head>
 <body>
+
+<div id="loading">📊 구글 시트에서 최신 데이터를 가져오는 중...</div>
+
 <div id="layout">
     <div id="sidebar">
-        <button id="toggle-btn" onclick="document.getElementById('sidebar').classList.toggle('hidden')">📊</button>
+        <button id="toggle-btn" onclick="document.getElementById('sidebar').classList.toggle('hidden')">☰</button>
         <div class="product-tabs">
-            <button class="tab-btn active" onclick="switchProduct('SM')">SM (122)</button>
-            <button class="tab-btn" onclick="switchProduct('AN')">AN (60)</button>
-            <button class="tab-btn" onclick="switchProduct('BD')">BD (172)</button>
+            <button class="tab-btn active" id="btn-SM" onclick="switchProduct('SM')">SM</button>
+            <button class="tab-btn" id="btn-AN" onclick="switchProduct('AN')">AN</button>
+            <button class="tab-btn" id="btn-BD" onclick="switchProduct('BD')">BD</button>
         </div>
-        <div class="header" onclick="resetToGlobal()">
-            <h1 id="prod-title" style="margin:0; font-size:0.9rem;">Global SM Plant Status</h1>
-            <p style="margin:3px 0 0 0; font-size:0.6rem; opacity:0.7;">Verified Absolute Full Data | 2026 BI</p>
+        <div class="header">
+            <h1 id="prod-title" style="margin:0; font-size:0.9rem;">Chemical Supply Map</h1>
+            <p style="margin:3px 0 0 0; font-size:0.6rem; opacity:0.8;">2026 Live Intelligence Business Unit</p>
         </div>
-        <div class="global-cap" onclick="resetToGlobal()">
-            <span style="font-size:0.62rem;">Global Total Capacity</span><br>
-            <strong id="global-val" style="font-size:1rem;">0</strong> <small>K MT/Y</small>
+        <div class="global-cap">
+            <span style="font-size:0.62rem; opacity:0.9;">Global Total Capacity</span><br>
+            <strong id="global-val" style="font-size:1.1rem;">0</strong> <small>K MT/Y</small>
         </div>
         <div id="list-container">
             <div id="current-risk-group" class="open">
-                <div class="group-header risk-header-current" onclick="this.parentElement.classList.toggle('open')"><span>⚠️ CURRENT RISK</span><span id="current-total-header"></span></div>
+                <div class="group-header risk-header-current" onclick="this.parentElement.classList.toggle('open')"><span>⚠️ CURRENT RISK</span><span id="cur-sum-h" style="font-size:0.65rem;"></span></div>
                 <div class="collapsible-content" id="current-risk-list"></div>
             </div>
             <div id="future-risk-group" class="open">
-                <div class="group-header risk-header-future" onclick="this.parentElement.classList.toggle('open')"><span>📅 FUTURE MAINT</span><span id="future-total-header"></span></div>
+                <div class="group-header risk-header-future" onclick="this.parentElement.classList.toggle('open')"><span>📅 FUTURE MAINT</span><span id="fut-sum-h" style="font-size:0.65rem;"></span></div>
                 <div class="collapsible-content" id="future-risk-list"></div>
             </div>
-            <div style="background: var(--primary); color:white; padding:8px 12px; font-size:0.75rem; font-weight:bold;">🌐 ALL PLANTS BY REGION</div>
             <div id="region-list"></div>
         </div>
     </div>
     <div id="map"></div>
 </div>
 
-<script src="data/data_sm.js"></script>
-<script src="data/data_an.js"></script>
-<script src="data/data_bd.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script>
-    // --- Configuration ---
-    const config = {
-        regionFlyTo: { 
-            "NEA": { c: [32, 122], z: 4 }, "SEA": { c: [5, 110], z: 5 }, 
-            "Western Europe": { c: [50, 10], z: 5 }, "Middle East": { c: [28, 50], z: 5 }, 
-            "North America": { c: [38, -95], z: 4 }, "South America": { c: [-25, -60], z: 4 },
-            "WE": { c: [50, 10], z: 5 }, "ME": { c: [28, 50], z: 5 }, "NA": { c: [38, -95], z: 4 }, "SA": { c: [-20, -55], z: 4 },
-            "CIS": { c: [55, 35], z: 4 }, "INDIAN SUB.": { c: [22, 75], z: 5 }, "AFRICA": { c: [30, 31], z: 6 }
-        },
-        regionColors: { 
-            "NEA": "#1597BB", "SEA": "#27AE60", "Western Europe": "#8E44AD", "WE": "#8E44AD",
-            "Middle East": "#F39C12", "ME": "#F39C12", "North America": "#D35400", "NA": "#D35400",
-            "South America": "#7F8C8D", "SA": "#7F8C8D", "CIS": "#2C3E50", "INDIAN SUB.": "#16A085", "AFRICA": "#34495E"
-        }
+    // --- ★ 사장님이 주신 URL이 완벽하게 적용되었습니다 ★ ---
+    const sheetURLs = {
+        'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv',
+        'AN': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=263516767&single=true&output=csv',
+        'BD': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=607848019&single=true&output=csv'
     };
 
-    let currentProduct = 'SM';
-    let activeMarkers = [];
-    const map = L.map('map', {zoomControl: false}).setView([20, 10], 2);
+    const map = L.map('map', {zoomControl: false}).setView([20, 110], 3);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-    function resetToGlobal() { map.flyTo([20, 10], 2, {duration: 2.0}); }
+    let activeMarkers = [];
 
-    function flyWithOffset(latlng, zoom) {
-        const sidebar = document.getElementById('sidebar');
-        const offset = sidebar.classList.contains('hidden') ? 0 : 320;
-        const target = map.project(latlng, zoom).subtract([offset / 2, 0]);
-        map.flyTo(map.unproject(target, zoom), zoom, { duration: 2.0 });
+    function parseCSV(csv) {
+        const lines = csv.split("\n");
+        const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
+        return lines.slice(1).filter(l => l.trim() !== "").map(line => {
+            const values = line.split(",");
+            let obj = {};
+            headers.forEach((h, i) => {
+                let val = values[i] ? values[i].trim() : "";
+                if (["capacity", "lat", "lng", "days"].includes(h)) val = parseFloat(val) || 0;
+                obj[h] = val;
+            });
+            return obj;
+        });
     }
 
-    function calculateLoss(p) { return p.days ? ((p.capacity / 365) * p.days).toFixed(1) : 0; }
-
-    function switchProduct(prod) {
-        currentProduct = prod;
+    async function switchProduct(prod) {
+        document.getElementById('loading').style.display = 'block';
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        event.target.classList.add('active');
-        document.getElementById('prod-title').innerText = `Global ${prod} Plant Status`;
-        updateDashboard();
+        document.getElementById('btn-' + prod).classList.add('active');
+
+        try {
+            const response = await fetch(sheetURLs[prod] + "&cache=" + new Date().getTime());
+            const csvText = await response.text();
+            const data = parseCSV(csvText);
+            renderDashboard(data, prod);
+        } catch (e) {
+            console.error(e);
+            alert("시트 데이터를 가져오지 못했습니다. 게시 설정을 확인해 주세요.");
+        } finally {
+            document.getElementById('loading').style.display = 'none';
+        }
     }
 
-    function createCard(p, totalCapa) {
-        const loss = calculateLoss(p);
-        const share = ((p.capacity / totalCapa) * 100).toFixed(2);
-        const isCur = p.status.includes('Current');
-        const isFut = p.status.includes('Future');
-        
-        const card = document.createElement('div');
-        card.className = `plant-card ${isCur?'current-risk':(isFut?'future-risk':'')}`;
-        const badgeCol = isCur ? 'black' : (isFut ? 'yellow' : '');
-        const lossBadge = (isCur || isFut) ? `<span class="loss-badge">${loss}K Loss</span>` : '';
-        const shareBadge = (isCur || isFut) ? `<span class="share-badge">${share}% Share</span>` : '';
-        
-        card.innerHTML = `${lossBadge}${shareBadge}<span class="badge ${badgeCol}">${p.status.split('(')[0]}</span><b>${p.company}</b><div class="capa-info">${p.capacity}K MT | ${p.days || 0} Days Stop</div>`;
-        card.onclick = (e) => { e.stopPropagation(); flyWithOffset([p.lat, p.lng], 9); setTimeout(() => p._m.openPopup(), 1800); };
-        return card;
-    }
-
-    function updateDashboard() {
+    function renderDashboard(data, prodName) {
         activeMarkers.forEach(m => map.removeLayer(m));
         activeMarkers = [];
         document.getElementById('current-risk-list').innerHTML = '';
         document.getElementById('future-risk-list').innerHTML = '';
         document.getElementById('region-list').innerHTML = '';
 
-        // 데이터 선택 (외부 JS 파일에서 로드된 변수 사용)
-        const data = (currentProduct === 'SM') ? data_sm : (currentProduct === 'AN' ? data_an : data_bd);
         const totalCapa = data.reduce((s, p) => s + p.capacity, 0);
         document.getElementById('global-val').innerText = totalCapa.toLocaleString();
+        document.getElementById('prod-title').innerText = `Global ${prodName} Plant Status`;
 
-        const nested = {};
+        let curLossTotal = 0;
+        let futLossTotal = 0;
+
+        // 리스크 계산 및 시각화 로직
         data.forEach(p => {
-            const isRisk = p.status.includes('Current') || p.status.includes('Future');
-            const m = L.circleMarker([p.lat, p.lng], { 
-                radius: Math.sqrt(p.capacity) * (currentProduct === 'BD' ? 0.75 : 0.6), 
-                fillColor: config.regionColors[p.region] || '#333', 
-                color: p.status.includes('Current') ? '#1A1A1B' : (p.status.includes('Future') ? '#F1C40F' : '#fff'),
-                weight: isRisk ? 5 : 1.5, fillOpacity: 0.85 
+            const isCur = p.status.includes('Current');
+            const isFut = p.status.includes('Future');
+            const loss = ((p.capacity / 365) * (p.days || 0)).toFixed(1);
+            
+            if(isCur) curLossTotal += parseFloat(loss);
+            if(isFut) futLossTotal += parseFloat(loss);
+
+            const color = isCur ? '#1A1A1B' : (isFut ? '#F1C40F' : '#1597BB');
+            const marker = L.circleMarker([p.lat, p.lng], {
+                radius: Math.sqrt(p.capacity) * (prodName === 'BD' ? 0.7 : 0.6),
+                fillColor: color, color: '#fff', weight: isCur || isFut ? 3 : 1, fillOpacity: 0.8
             }).addTo(map);
 
-            const loss = calculateLoss(p);
-            const share = ((p.capacity / totalCapa) * 100).toFixed(2);
-            let pop = `<b>${p.company}</b><br>${p.location}<br>Annual Capa: ${p.capacity}K (${share}% Share)<br>Status: <b>${p.status}</b>`;
-            if(p.days) pop += `<br><span style="color:red; font-weight:bold;">Loss in Period: ${loss}K MT</span><br><small>Period: ${p.period}</small>`;
-            m.bindPopup(pop); p._m = m; activeMarkers.push(m);
+            const popupContent = `<b>${p.company}</b><br>${p.location}<br>Capa: ${p.capacity}K<br>Status: ${p.status}${isCur||isFut ? '<br><span style="color:red">Loss: '+loss+'K</span>' : ''}`;
+            marker.bindPopup(popupContent);
+            activeMarkers.push(marker);
 
-            // Grouping Logic
-            if (!nested[p.region]) nested[p.region] = { capa: 0, countries: {} };
-            if (!nested[p.region].countries[p.country]) nested[p.region].countries[p.country] = { capa: 0, plants: [] };
-            nested[p.region].capa += p.capacity;
-            nested[p.region].countries[p.country].capa += p.capacity;
-            nested[p.region].countries[p.country].plants.push(p);
+            // 카드 리스트 생성
+            const card = document.createElement('div');
+            card.className = `plant-card ${isCur?'current-risk':(isFut?'future-risk':'')}`;
+            card.innerHTML = `${isCur||isFut ? '<span class="loss-badge">'+loss+'K Loss</span>' : ''}<b>${p.company}</b><div class="capa-info">${p.capacity}K MT | ${p.status}</div>`;
+            card.onclick = () => { 
+                const offset = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 160;
+                map.flyTo([p.lat, p.lng], 8); 
+                setTimeout(() => marker.openPopup(), 500); 
+            };
+
+            if(isCur) document.getElementById('current-risk-list').appendChild(card);
+            else if(isFut) document.getElementById('future-risk-list').appendChild(card);
         });
 
-        // Risk Stats & List
-        const curRisks = data.filter(p => p.status.includes('Current'));
-        const futRisks = data.filter(p => p.status.includes('Future'));
-        const curLossSum = curRisks.reduce((s, p) => s + parseFloat(calculateLoss(p)), 0).toFixed(1);
-        const futLossSum = futRisks.reduce((s, p) => s + parseFloat(calculateLoss(p)), 0).toFixed(1);
-        
-        document.getElementById('current-total-header').innerText = `${parseFloat(curLossSum).toLocaleString()}K (${((curLossSum/totalCapa)*100).toFixed(1)}% Loss) ▼`;
-        document.getElementById('future-total-header').innerText = `${parseFloat(futLossSum).toLocaleString()}K (${((futLossSum/totalCapa)*100).toFixed(1)}% Loss) ▼`;
-
-        curRisks.sort((a,b)=>b.capacity-a.capacity).forEach(p=>document.getElementById('current-risk-list').appendChild(createCard(p, totalCapa)));
-        futRisks.sort((a,b)=>b.capacity-a.capacity).forEach(p=>document.getElementById('future-risk-list').appendChild(createCard(p, totalCapa)));
-
-        // Region List
-        Object.entries(nested).sort((a,b)=>b[1].capa - a[1].capa).forEach(([rName, rData]) => {
-            const rDiv = document.createElement('div');
-            rDiv.className = 'region-group';
-            rDiv.innerHTML = `<div class="group-header region-header" onclick="flyWithOffset(config.regionFlyTo['${rName}'].c, config.regionFlyTo['${rName}'].z); this.parentElement.classList.toggle('open')"><span>${rName} (${((rData.capa/totalCapa)*100).toFixed(1)}%)</span><span>▼</span></div><div class="collapsible-content"></div>`;
-            const countryList = rDiv.querySelector('.collapsible-content');
-            Object.entries(rData.countries).sort((a,b)=>b[1].capa-a[1].capa).forEach(([cName, cData]) => {
-                const cDiv = document.createElement('div');
-                cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open')"><span>${cName}</span><span>▼</span></div><div class="collapsible-content"></div>`;
-                const pList = cDiv.querySelector('.collapsible-content');
-                cData.plants.sort((a,b)=>b.capacity-a.capacity).forEach(p => pList.appendChild(createCard(p, totalCapa)));
-                countryList.appendChild(cDiv);
-            });
-            document.getElementById('region-list').appendChild(rDiv);
-        });
+        document.getElementById('cur-sum-h').innerText = curLossTotal.toFixed(1) + "K MT Loss";
+        document.getElementById('fut-sum-h').innerText = futLossTotal.toFixed(1) + "K MT Loss";
     }
 
-    // 초기 실행
-    window.onload = () => { if(typeof data_sm !== 'undefined') updateDashboard(); };
+    window.onload = () => switchProduct('SM');
 </script>
 </body>
 </html>
