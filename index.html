@@ -2,9 +2,8 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Chemical Control Tower | JS KIM</title>
+    <title>Global Supply Control Tower | JS KIM</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         :root { --primary: #0A2647; --accent: #1597BB; --current: #1A1A1B; --future: #D35400; --bg: #F0F5F9; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Pretendard', sans-serif; overflow: hidden; }
@@ -13,10 +12,8 @@
         
         /* 마커 고정 엔진 */
         .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-popup { 
-            -webkit-backface-visibility: hidden;
-            backface-visibility: hidden;
-            will-change: transform;
-            transition: none !important; 
+            -webkit-backface-visibility: hidden; backface-visibility: hidden;
+            will-change: transform; transition: none !important; 
         }
         
         #sidebar { position: absolute; left: 0; top: 0; width: 360px; height: 100%; background: white; z-index: 2000; transition: transform 0.4s ease; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
@@ -32,25 +29,24 @@
         #prod-title { margin: 0; font-size: 1.25rem; letter-spacing: -0.5px; cursor: pointer; }
 
         .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; background: var(--accent); color: white; gap: 1px; }
-        .metric-box { padding: 12px 10px; background: var(--accent); text-align: center; }
-        .metric-label { font-size: 0.65rem; opacity: 0.9; display: block; font-weight: bold; margin-bottom: 3px; }
-        /* ★ 상단 메트릭 수치 확대 ★ */
-        .metric-value { font-size: 1.8rem; font-weight: 900; line-height: 1.2; }
+        .metric-box { padding: 10px; background: var(--accent); text-align: center; }
+        .metric-label { font-size: 0.6rem; opacity: 0.9; display: block; font-weight: bold; margin-bottom: 2px; }
+        /* ★ 상단 메트릭 수치 최적화 ★ */
+        .metric-value { font-size: 1.2rem; font-weight: 900; }
 
         #list-container { flex-grow: 1; overflow-y: auto; background: var(--bg); }
-        .group-header { padding: 16px 12px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.9rem; align-items: center; }
+        .group-header { padding: 12px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.85rem; align-items: center; }
         .region-header { background: #cbdceb; color: var(--primary); margin-top: 2px; }
-        .country-header { background: #e8eff5; font-size: 0.8rem; padding-left: 20px; border-left: 4px solid var(--accent); }
+        .country-header { background: #e8eff5; font-size: 0.78rem; padding-left: 20px; border-left: 3px solid var(--accent); }
         
-        /* ★ 지역/국가 통계 숫자 확대 (2배) ★ */
-        .header-stats { font-weight: 900; display: block; margin-top: 6px; letter-spacing: -0.5px; }
+        /* ★ 지역/국가 통계 숫자 40% 축소 및 찐하게 ★ */
+        .header-stats { font-weight: 900; display: block; margin-top: 2px; letter-spacing: -0.2px; font-size: 0.85rem; }
         
         .collapsible-content { display: none; }
         .open > .collapsible-content { display: block; }
         
         .plant-card { padding: 10px 12px 10px 30px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.72rem; background: white; position: relative; }
-        .share-tag { font-size: 0.65rem; color: #1597BB; font-weight: bold; margin-left: 5px; }
-        .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 2px 8px; border-radius: 12px; font-size: 0.65rem; position: absolute; right: 10px; top: 10px; }
+        .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 2px 6px; border-radius: 10px; font-size: 0.6rem; position: absolute; right: 10px; top: 10px; }
         
         #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; background: rgba(0,0,0,0.85); color: white; padding: 25px; border-radius: 15px; display: none; text-align: center; }
         .custom-triangle svg { filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.2)); display: block; }
@@ -74,22 +70,22 @@
         </div>
         
         <div class="metrics-grid">
-            <div class="metric-box"><span class="metric-label">GLOBAL CAPA (K)</span><span class="metric-value" id="global-val" style="font-size:1.4rem;">0</span></div>
-            <div class="metric-box"><span class="metric-label">TOTAL SITES</span><span class="metric-value" id="total-sites" style="font-size:1.4rem;">0</span></div>
+            <div class="metric-box"><span class="metric-label">GLOBAL CAPA (K)</span><span class="metric-value" id="global-val">0</span></div>
+            <div class="metric-box"><span class="metric-label">TOTAL SITES</span><span class="metric-value" id="total-sites">0</span></div>
             <div class="metric-box" style="background: #1A1A1B;"><span class="metric-label">CUR. LOSS RATIO</span><span class="metric-value" id="cur-ratio" style="color:#FF4D4D">0%</span></div>
             <div class="metric-box" style="background: #D35400;"><span class="metric-label">FUT. LOSS RATIO</span><span class="metric-value" id="fut-ratio" style="color:#FFD700">0%</span></div>
         </div>
 
         <div id="list-container">
             <div id="current-risk-group" class="open">
-                <div class="group-header" style="background:var(--current); color:white" onclick="this.parentElement.classList.toggle('open')"><span>⚠️ CURRENT RISK</span><span id="cur-sum-h" style="font-size:1rem; font-weight:800;"></span></div>
+                <div class="group-header" style="background:var(--current); color:white" onclick="this.parentElement.classList.toggle('open')"><span>⚠️ CURRENT RISK</span><span id="cur-sum-h" style="font-size:0.75rem; font-weight:800;"></span></div>
                 <div class="collapsible-content" id="current-risk-list"></div>
             </div>
             <div id="future-risk-group" class="open">
-                <div class="group-header" style="background:var(--future); color:white" onclick="this.parentElement.classList.toggle('open')"><span>📅 FUTURE MAINT</span><span id="fut-sum-h" style="font-size:1rem; font-weight:800;"></span></div>
+                <div class="group-header" style="background:var(--future); color:white" onclick="this.parentElement.classList.toggle('open')"><span>📅 FUTURE MAINT</span><span id="fut-sum-h" style="font-size:0.75rem; font-weight:800;"></span></div>
                 <div class="collapsible-content" id="future-risk-list"></div>
             </div>
-            <div style="background: var(--primary); color:white; padding:12px; font-size:0.8rem; font-weight:bold; margin-top:10px;">🌐 REGIONAL DIRECTORY</div>
+            <div style="background: var(--primary); color:white; padding:10px 12px; font-size:0.75rem; font-weight:bold; margin-top:10px;">🌐 REGIONAL DIRECTORY</div>
             <div id="region-list"></div>
         </div>
     </div>
@@ -170,15 +166,16 @@
 
         data.forEach(p => {
             if(!p.lat || !p.lng) return;
+            const capa = p.capacity || 0;
             const isCur = p.status && p.status.includes('Current');
             const isFut = p.status && p.status.includes('Future');
-            const loss = ((p.capacity / 365) * (p.days || 0)).toFixed(1);
+            const loss = ((capa / 365) * (p.days || 0)).toFixed(1);
             
             if(isCur) curLoss += parseFloat(loss);
             if(isFut) futLoss += parseFloat(loss);
 
             let marker;
-            const baseSize = Math.sqrt(p.capacity) * 0.55;
+            const baseSize = Math.sqrt(capa) * 0.55;
             if (isCur || isFut) {
                 const color = isCur ? '#1A1A1B' : '#D35400';
                 marker = L.marker([p.lat, p.lng], {
@@ -195,16 +192,16 @@
                 }).addTo(map);
             }
             
-            marker.bindPopup(`<b>${p.company}</b><br>Capa: ${p.capacity}K<br>Status: ${p.status}`);
+            marker.bindPopup(`<b>${p.company}</b><br>Capa: ${capa}K<br>Status: ${p.status}`);
             marker.on('click', (e) => { L.DomEvent.stopPropagation(e); moveToPlant(p.lat, p.lng, marker); });
             activeMarkers.push(marker);
             p._m = marker;
 
             const createCard = (showShare = true) => {
-                const share = ((p.capacity / globalTotalCapa) * 100).toFixed(1);
+                const share = ((capa / globalTotalCapa) * 100).toFixed(1);
                 const card = document.createElement('div');
                 card.className = `plant-card ${isCur?'current-risk':(isFut?'future-risk':'')}`;
-                card.innerHTML = `${(isCur||isFut) ? `<span class="loss-badge">${loss}K Loss</span>` : ''}<b>${p.company}</b>${showShare ? `<span class="share-tag">(${share}%)</span>` : ''}<div class="capa-info">${p.capacity}K MT | ${p.status}</div>`;
+                card.innerHTML = `${(isCur||isFut) ? `<span class="loss-badge">${loss}K Loss</span>` : ''}<b>${p.company}</b>${showShare ? '<span class="share-tag">('+share+'%)</span>' : ''}<div class="capa-info">${capa}K MT | ${p.status}</div>`;
                 card.onclick = () => moveToPlant(p.lat, p.lng, p._m);
                 return card;
             };
@@ -218,9 +215,9 @@
             if (!regions[reg].countries[cou]) regions[reg].countries[cou] = { plants: [], countryCapa: 0 };
             
             regions[reg].countries[cou].plants.push(createCard(true));
-            regions[reg].countries[cou].countryCapa += p.capacity;
+            regions[reg].countries[cou].countryCapa += capa;
             regions[reg].totalPlants++;
-            regions[reg].totalCapa += p.capacity;
+            regions[reg].totalCapa += capa;
         });
 
         document.getElementById('cur-ratio').innerText = globalTotalCapa > 0 ? ((curLoss / globalTotalCapa) * 100).toFixed(2) + "%" : "0%";
@@ -228,13 +225,13 @@
         document.getElementById('cur-sum-h').innerText = curLoss.toFixed(1) + "K Loss ▼";
         document.getElementById('fut-sum-h').innerText = futLoss.toFixed(1) + "K Loss ▼";
 
-        // ★ 지역 및 국가별 헤더 렌더링 ★
+        // 지역 및 국가별 헤더 렌더링
         Object.values(regions).sort((a,b) => b.totalPlants - a.totalPlants).forEach(r => {
             const rShare = ((r.totalCapa / globalTotalCapa) * 100).toFixed(1);
             const rDiv = document.createElement('div');
             rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open')">
                                 <span>${r.name} (${r.totalPlants})
-                                <span class="header-stats" style="font-size:1.4rem; color:#C0392B;">${Math.round(r.totalCapa).toLocaleString()}K (${rShare}%)</span></span>
+                                <span class="header-stats" style="color:#C0392B;">${Math.round(r.totalCapa).toLocaleString()}K (${rShare}%)</span></span>
                                 <span>▼</span></div><div class="collapsible-content"></div>`;
             const rCont = rDiv.querySelector('.collapsible-content');
 
@@ -244,7 +241,7 @@
                 const cDiv = document.createElement('div');
                 cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open')">
                                     <span>${c} (${cData.plants.length})
-                                    <span class="header-stats" style="font-size:1.3rem; color:#1597BB;">${Math.round(cData.countryCapa).toLocaleString()}K (${cShare}%)</span></span>
+                                    <span class="header-stats" style="font-size:0.8rem; color:#1597BB;">${Math.round(cData.countryCapa).toLocaleString()}K (${cShare}%)</span></span>
                                     <span>▼</span></div><div class="collapsible-content"></div>`;
                 const cCont = cDiv.querySelector('.collapsible-content');
                 cData.plants.forEach(card => cCont.appendChild(card));
