@@ -11,7 +11,7 @@
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
         #map { flex-grow: 1; height: 100%; background: #DAEAF1; z-index: 1; }
         
-        /* 마커 고정 및 동기화 설정 */
+        /* 마커 고정 엔진 */
         .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-popup { 
             -webkit-backface-visibility: hidden;
             backface-visibility: hidden;
@@ -32,24 +32,25 @@
         #prod-title { margin: 0; font-size: 1.25rem; letter-spacing: -0.5px; cursor: pointer; }
 
         .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; background: var(--accent); color: white; gap: 1px; }
-        .metric-box { padding: 10px; background: var(--accent); text-align: center; }
-        .metric-label { font-size: 0.55rem; opacity: 0.9; display: block; }
-        .metric-value { font-size: 0.95rem; font-weight: bold; }
+        .metric-box { padding: 12px 10px; background: var(--accent); text-align: center; }
+        .metric-label { font-size: 0.65rem; opacity: 0.9; display: block; font-weight: bold; margin-bottom: 3px; }
+        /* ★ 상단 메트릭 수치 확대 ★ */
+        .metric-value { font-size: 1.8rem; font-weight: 900; line-height: 1.2; }
 
         #list-container { flex-grow: 1; overflow-y: auto; background: var(--bg); }
-        .group-header { padding: 14px 12px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.85rem; align-items: center; line-height: 1.5; }
+        .group-header { padding: 16px 12px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.9rem; align-items: center; }
         .region-header { background: #cbdceb; color: var(--primary); margin-top: 2px; }
-        .country-header { background: #e8eff5; font-size: 0.75rem; padding-left: 20px; }
+        .country-header { background: #e8eff5; font-size: 0.8rem; padding-left: 20px; border-left: 4px solid var(--accent); }
         
-        /* 분석 숫자 스타일 (요청대로 2배 크기 적용) */
-        .header-stats { font-weight: normal; font-size: 1.1rem; color: #E74C3C; display: block; margin-top: 4px; }
+        /* ★ 지역/국가 통계 숫자 확대 (2배) ★ */
+        .header-stats { font-weight: 900; display: block; margin-top: 6px; letter-spacing: -0.5px; }
         
         .collapsible-content { display: none; }
         .open > .collapsible-content { display: block; }
         
         .plant-card { padding: 10px 12px 10px 30px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.72rem; background: white; position: relative; }
-        .share-tag { font-size: 0.6rem; color: #1597BB; font-weight: bold; margin-left: 5px; }
-        .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 1px 6px; border-radius: 10px; font-size: 0.6rem; position: absolute; right: 10px; top: 10px; }
+        .share-tag { font-size: 0.65rem; color: #1597BB; font-weight: bold; margin-left: 5px; }
+        .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 2px 8px; border-radius: 12px; font-size: 0.65rem; position: absolute; right: 10px; top: 10px; }
         
         #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; background: rgba(0,0,0,0.85); color: white; padding: 25px; border-radius: 15px; display: none; text-align: center; }
         .custom-triangle svg { filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.2)); display: block; }
@@ -73,22 +74,22 @@
         </div>
         
         <div class="metrics-grid">
-            <div class="metric-box"><span class="metric-label">GLOBAL CAPA (K)</span><span class="metric-value" id="global-val">0</span></div>
-            <div class="metric-box"><span class="metric-label">TOTAL SITES</span><span class="metric-value" id="total-sites">0</span></div>
-            <div class="metric-box" style="background: #1A1A1B;"><span class="metric-label">CUR. LOSS RATIO</span><span class="metric-value" id="cur-ratio" style="color:#E74C3C">0%</span></div>
-            <div class="metric-box" style="background: #D35400;"><span class="metric-label">FUT. LOSS RATIO</span><span class="metric-value" id="fut-ratio" style="color:#F1C40F">0%</span></div>
+            <div class="metric-box"><span class="metric-label">GLOBAL CAPA (K)</span><span class="metric-value" id="global-val" style="font-size:1.4rem;">0</span></div>
+            <div class="metric-box"><span class="metric-label">TOTAL SITES</span><span class="metric-value" id="total-sites" style="font-size:1.4rem;">0</span></div>
+            <div class="metric-box" style="background: #1A1A1B;"><span class="metric-label">CUR. LOSS RATIO</span><span class="metric-value" id="cur-ratio" style="color:#FF4D4D">0%</span></div>
+            <div class="metric-box" style="background: #D35400;"><span class="metric-label">FUT. LOSS RATIO</span><span class="metric-value" id="fut-ratio" style="color:#FFD700">0%</span></div>
         </div>
 
         <div id="list-container">
             <div id="current-risk-group" class="open">
-                <div class="group-header" style="background:var(--current); color:white" onclick="this.parentElement.classList.toggle('open')"><span>⚠️ CURRENT RISK</span><span id="cur-sum-h" style="font-size:0.65rem;"></span></div>
+                <div class="group-header" style="background:var(--current); color:white" onclick="this.parentElement.classList.toggle('open')"><span>⚠️ CURRENT RISK</span><span id="cur-sum-h" style="font-size:1rem; font-weight:800;"></span></div>
                 <div class="collapsible-content" id="current-risk-list"></div>
             </div>
             <div id="future-risk-group" class="open">
-                <div class="group-header" style="background:var(--future); color:white" onclick="this.parentElement.classList.toggle('open')"><span>📅 FUTURE MAINT</span><span id="fut-sum-h" style="font-size:0.65rem;"></span></div>
+                <div class="group-header" style="background:var(--future); color:white" onclick="this.parentElement.classList.toggle('open')"><span>📅 FUTURE MAINT</span><span id="fut-sum-h" style="font-size:1rem; font-weight:800;"></span></div>
                 <div class="collapsible-content" id="future-risk-list"></div>
             </div>
-            <div style="background: var(--primary); color:white; padding:10px 12px; font-size:0.75rem; font-weight:bold; margin-top:10px;">🌐 REGIONAL DIRECTORY</div>
+            <div style="background: var(--primary); color:white; padding:12px; font-size:0.8rem; font-weight:bold; margin-top:10px;">🌐 REGIONAL DIRECTORY</div>
             <div id="region-list"></div>
         </div>
     </div>
@@ -227,23 +228,23 @@
         document.getElementById('cur-sum-h').innerText = curLoss.toFixed(1) + "K Loss ▼";
         document.getElementById('fut-sum-h').innerText = futLoss.toFixed(1) + "K Loss ▼";
 
-        // 지역별 및 국가별 정렬/렌더링
+        // ★ 지역 및 국가별 헤더 렌더링 ★
         Object.values(regions).sort((a,b) => b.totalPlants - a.totalPlants).forEach(r => {
-            const rShare = globalTotalCapa > 0 ? ((r.totalCapa / globalTotalCapa) * 100).toFixed(1) : 0;
+            const rShare = ((r.totalCapa / globalTotalCapa) * 100).toFixed(1);
             const rDiv = document.createElement('div');
             rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open')">
                                 <span>${r.name} (${r.totalPlants})
-                                <span class="header-stats">${Math.round(r.totalCapa).toLocaleString()}K (${rShare}%)</span></span>
+                                <span class="header-stats" style="font-size:1.4rem; color:#C0392B;">${Math.round(r.totalCapa).toLocaleString()}K (${rShare}%)</span></span>
                                 <span>▼</span></div><div class="collapsible-content"></div>`;
             const rCont = rDiv.querySelector('.collapsible-content');
 
             Object.keys(r.countries).sort().forEach(c => {
                 const cData = r.countries[c];
-                const cShare = globalTotalCapa > 0 ? ((cData.countryCapa / globalTotalCapa) * 100).toFixed(1) : 0;
+                const cShare = ((cData.countryCapa / globalTotalCapa) * 100).toFixed(1);
                 const cDiv = document.createElement('div');
                 cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open')">
                                     <span>${c} (${cData.plants.length})
-                                    <span class="header-stats" style="font-size:0.95rem; color:#1597BB;">${Math.round(cData.countryCapa).toLocaleString()}K (${cShare}%)</span></span>
+                                    <span class="header-stats" style="font-size:1.3rem; color:#1597BB;">${Math.round(cData.countryCapa).toLocaleString()}K (${cShare}%)</span></span>
                                     <span>▼</span></div><div class="collapsible-content"></div>`;
                 const cCont = cDiv.querySelector('.collapsible-content');
                 cData.plants.forEach(card => cCont.appendChild(card));
