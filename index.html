@@ -11,11 +11,13 @@
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
         #map { flex-grow: 1; height: 100%; background: #DAEAF1; z-index: 1; }
         
-        /* ★ 핵심: 모든 개별 애니메이션을 제거하여 지도와 100% 동기화 ★ */
-        .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-zoom-animated, .leaflet-popup { 
+        /* ★ 핵심: 마커가 확대될 때 커지는 현상을 원천 차단 ★ */
+        .leaflet-marker-icon, .leaflet-marker-shadow { 
             transition: none !important; 
-            will-change: transform; 
+            transform-origin: center center;
         }
+        /* 팝업도 지도 움직임에 즉각 반응하도록 설정 */
+        .leaflet-popup { transition: none !important; }
 
         #sidebar { position: absolute; left: 0; top: 0; width: 360px; height: 100%; background: white; z-index: 2000; transition: transform 0.4s ease; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
         #sidebar.hidden { transform: translateX(-100%); }
@@ -26,7 +28,6 @@
         .tab-btn.active { background: var(--accent); color: white; }
         
         .header { background: var(--primary); color: white; padding: 22px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        /* 제작자 문구: 노란색 강조, 크게 유지 */
         .created-by { font-size: 1.3rem; color: #FFD700; font-weight: 900; margin-bottom: 12px; display: block; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
         #prod-title { margin: 0; font-size: 1.25rem; letter-spacing: -0.5px; cursor: pointer; }
 
@@ -104,26 +105,22 @@
         "SA": { fill: "#58D68D", border: "#239B56" }, "IND": { fill: "#F4D03F", border: "#B7950B" }, "Other": { fill: "#BDC3C7", border: "#7F8C8D" }
     };
 
-    const map = L.map('map', {zoomControl: false, zoomAnimation: true}).setView([20, 100], 3);
+    // ★ 맵 설정에서 markerZoomAnimation: false 로 마커 커짐 방지 ★
+    const map = L.map('map', {zoomControl: false, zoomAnimation: true, markerZoomAnimation: false}).setView([20, 100], 3);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
 
     let activeMarkers = [];
 
-    // ★ 오프셋 정중앙 이동 & 안착 후 팝업 로직 ★
     function moveToPlant(lat, lng, marker) {
         const offset = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360;
-        
-        // 줌 레벨을 9에서 7로 하향 조정 (사장님 요청)
         const zoomLevel = 7;
         const targetPoint = map.project([lat, lng], zoomLevel).subtract([offset / 2, 0]);
         
-        // 이동 애니메이션 설정
         map.flyTo(map.unproject(targetPoint, zoomLevel), zoomLevel, { 
             duration: 1.5, 
             easeLinearity: 0.25 
         });
 
-        // 지도가 멈추면 그때 팝업을 띄움 (불일치 완전 방지)
         map.once('moveend', () => {
             if(marker) marker.openPopup();
         });
@@ -246,7 +243,7 @@
                 cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open')"><span>${c} (${r.countries[c].length})</span><span>▼</span></div><div class="collapsible-content"></div>`;
                 const cCont = cDiv.querySelector('.collapsible-content');
                 r.countries[c].forEach(card => cCont.appendChild(card));
-                rCont.appendChild(cDiv);
+                cCont.appendChild(cDiv);
             });
             document.getElementById('region-list').appendChild(rDiv);
         });
