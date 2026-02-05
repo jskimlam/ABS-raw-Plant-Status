@@ -31,7 +31,6 @@
         .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; background: var(--accent); color: white; gap: 1px; }
         .metric-box { padding: 10px; background: var(--accent); text-align: center; }
         .metric-label { font-size: 0.6rem; opacity: 0.9; display: block; font-weight: bold; margin-bottom: 2px; }
-        /* ★ 상단 메트릭 수치 최적화 ★ */
         .metric-value { font-size: 1.2rem; font-weight: 900; }
 
         #list-container { flex-grow: 1; overflow-y: auto; background: var(--bg); }
@@ -39,7 +38,6 @@
         .region-header { background: #cbdceb; color: var(--primary); margin-top: 2px; }
         .country-header { background: #e8eff5; font-size: 0.78rem; padding-left: 20px; border-left: 3px solid var(--accent); }
         
-        /* ★ 지역/국가 통계 숫자 40% 축소 및 찐하게 ★ */
         .header-stats { font-weight: 900; display: block; margin-top: 2px; letter-spacing: -0.2px; font-size: 0.85rem; }
         
         .collapsible-content { display: none; }
@@ -101,9 +99,17 @@
     };
 
     const regionStyles = {
-        "NEA": { fill: "#5DADE2", border: "#2E86C1" }, "SEA": { fill: "#48C9B0", border: "#16A085" }, "NA": { fill: "#52BE80", border: "#1E8449" }, "WE": { fill: "#AF7AC5", border: "#7D3C98" },
-        "CE": { fill: "#9B59B6", border: "#6C3483" }, "CIS": { fill: "#EB984E", border: "#A04000" }, "ME": { fill: "#EC7063", border: "#B03A2E" }, "AFRICA": { fill: "#A04000", border: "#5D2300" },
-        "SA": { fill: "#58D68D", border: "#239B56" }, "IND": { fill: "#F4D03F", border: "#B7950B" }, "Other": { fill: "#BDC3C7", border: "#7F8C8D" }
+        "NEA": { fill: "#5DADE2", border: "#2E86C1", coord: [35, 125] },
+        "SEA": { fill: "#48C9B0", border: "#16A085", coord: [10, 110] },
+        "NA": { fill: "#52BE80", border: "#1E8449", coord: [40, -100] },
+        "WE": { fill: "#AF7AC5", border: "#7D3C98", coord: [50, 5] },
+        "CE": { fill: "#9B59B6", border: "#6C3483", coord: [50, 20] },
+        "CIS": { fill: "#EB984E", border: "#A04000", coord: [55, 60] },
+        "ME": { fill: "#EC7063", border: "#B03A2E", coord: [25, 45] },
+        "AFRICA": { fill: "#A04000", border: "#5D2300", coord: [0, 20] },
+        "SA": { fill: "#58D68D", border: "#239B56", coord: [-15, -60] },
+        "IND": { fill: "#F4D03F", border: "#B7950B", coord: [20, 77] },
+        "Other": { fill: "#BDC3C7", border: "#7F8C8D", coord: [20, 100] }
     };
 
     const map = L.map('map', {zoomControl: false, zoomAnimation: true, markerZoomAnimation: false}).setView([20, 100], 3);
@@ -111,12 +117,12 @@
 
     let activeMarkers = [];
 
-    function moveToPlant(lat, lng, marker) {
+    // 공통 이동 함수 (줌 레벨 제어 가능)
+    function flyToTarget(lat, lng, zoom, marker = null) {
         const offset = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360;
-        const zoomLevel = 7;
-        const targetPoint = map.project([lat, lng], zoomLevel).subtract([offset / 2, 0]);
-        map.flyTo(map.unproject(targetPoint, zoomLevel), zoomLevel, { duration: 1.5, easeLinearity: 0.25 });
-        map.once('moveend', () => { if(marker) marker.openPopup(); });
+        const targetPoint = map.project([lat, lng], zoom).subtract([offset / 2, 0]);
+        map.flyTo(map.unproject(targetPoint, zoom), zoom, { duration: 1.5, easeLinearity: 0.25 });
+        if(marker) map.once('moveend', () => marker.openPopup());
     }
 
     function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
@@ -193,7 +199,7 @@
             }
             
             marker.bindPopup(`<b>${p.company}</b><br>Capa: ${capa}K<br>Status: ${p.status}`);
-            marker.on('click', (e) => { L.DomEvent.stopPropagation(e); moveToPlant(p.lat, p.lng, marker); });
+            marker.on('click', (e) => { L.DomEvent.stopPropagation(e); flyToTarget(p.lat, p.lng, 7, marker); });
             activeMarkers.push(marker);
             p._m = marker;
 
@@ -201,8 +207,8 @@
                 const share = ((capa / globalTotalCapa) * 100).toFixed(1);
                 const card = document.createElement('div');
                 card.className = `plant-card ${isCur?'current-risk':(isFut?'future-risk':'')}`;
-                card.innerHTML = `${(isCur||isFut) ? `<span class="loss-badge">${loss}K Loss</span>` : ''}<b>${p.company}</b>${showShare ? '<span class="share-tag">('+share+'%)</span>' : ''}<div class="capa-info">${capa}K MT | ${p.status}</div>`;
-                card.onclick = () => moveToPlant(p.lat, p.lng, p._m);
+                card.innerHTML = `${(isCur||isFut) ? `<span class="loss-badge">${loss}K Loss</span>` : ''}<b>${p.company}</b>${showShare ? `<span class="share-tag">(${share}%)</span>` : ''}<div class="capa-info">${capa}K MT | ${p.status}</div>`;
+                card.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); };
                 return card;
             };
 
@@ -225,14 +231,19 @@
         document.getElementById('cur-sum-h').innerText = curLoss.toFixed(1) + "K Loss ▼";
         document.getElementById('fut-sum-h').innerText = futLoss.toFixed(1) + "K Loss ▼";
 
-        // 지역 및 국가별 헤더 렌더링
+        // 지역별 렌더링
         Object.values(regions).sort((a,b) => b.totalPlants - a.totalPlants).forEach(r => {
             const rShare = ((r.totalCapa / globalTotalCapa) * 100).toFixed(1);
             const rDiv = document.createElement('div');
-            rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open')">
+            
+            // ★ 지역 헤더 클릭 시 해당 대륙으로 이동 (줌 레벨 4.5로 50% 축소 조망) ★
+            const regInfo = regionStyles[Object.keys(regionStyles).find(k => r.name.includes(k))] || regionStyles.Other;
+            
+            rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${regInfo.coord[0]}, ${regInfo.coord[1]}, 4.5);">
                                 <span>${r.name} (${r.totalPlants})
                                 <span class="header-stats" style="color:#C0392B;">${Math.round(r.totalCapa).toLocaleString()}K (${rShare}%)</span></span>
                                 <span>▼</span></div><div class="collapsible-content"></div>`;
+            
             const rCont = rDiv.querySelector('.collapsible-content');
 
             Object.keys(r.countries).sort().forEach(c => {
