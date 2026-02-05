@@ -2,17 +2,17 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Chemical Control Tower | JS KIM</title>
+    <title>Global Supply Control Tower | JS KIM</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         :root { --primary: #0A2647; --accent: #1597BB; --current: #1A1A1B; --future: #D35400; --bg: #F0F5F9; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Pretendard', sans-serif; overflow: hidden; }
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
         #map { flex-grow: 1; height: 100%; background: #DAEAF1; z-index: 1; }
         
-        /* ★ 자연스러운 움직임을 위한 최적화 로직 ★ */
-        .leaflet-zoom-animated { will-change: transform; transition: transform 1.2s cubic-bezier(0.25, 0.1, 0.25, 1) !important; }
-        /* 마커가 지도 좌표를 즉각 따라가도록 개별 트랜지션 제거 */
+        /* ★ 핵심: 마커가 지도 종이에 인쇄된 것처럼 붙어 움직이게 설정 ★ */
+        .leaflet-zoom-animated { transition: transform 0.8s cubic-bezier(0.25, 0.1, 0.25, 1) !important; }
         .leaflet-marker-icon { transition: none !important; will-change: transform; }
 
         #sidebar { position: absolute; left: 0; top: 0; width: 360px; height: 100%; background: white; z-index: 2000; transition: transform 0.4s ease; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
@@ -24,13 +24,13 @@
         .tab-btn.active { background: var(--accent); color: white; }
         
         .header { background: var(--primary); color: white; padding: 22px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        /* 제작자 문구: 30% 확대, 선명한 노란색 강조 */
-        .created-by { font-size: 1.25rem; color: #FFD700; font-weight: 900; margin-bottom: 12px; display: block; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); letter-spacing: 0.5px; }
+        /* 제작자 문구: 노란색 강조, 30% 크게 */
+        .created-by { font-size: 1.3rem; color: #FFD700; font-weight: 900; margin-bottom: 12px; display: block; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
         
-        #prod-title { margin: 0; font-size: 1.25rem; letter-spacing: -0.5px; cursor: pointer; display: inline-block; transition: 0.2s; }
+        #prod-title { margin: 0; font-size: 1.25rem; letter-spacing: -0.5px; cursor: pointer; transition: 0.2s; }
         #prod-title:hover { color: #FFD700; }
 
-        .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; background: var(--accent); color: white; gap: 1px; border-top: 1px solid rgba(255,255,255,0.2); }
+        .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; background: var(--accent); color: white; gap: 1px; }
         .metric-box { padding: 10px; background: var(--accent); text-align: center; }
         .metric-label { font-size: 0.55rem; opacity: 0.9; display: block; }
         .metric-value { font-size: 0.95rem; font-weight: bold; }
@@ -39,7 +39,7 @@
         .group-header { padding: 12px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.8rem; align-items: center; }
         .risk-header-current { background: var(--current); color: white; }
         .risk-header-future { background: var(--future); color: white; }
-        .region-header { background: #cbdceb; color: var(--primary); margin-top: 2px; line-height: 1.3; }
+        .region-header { background: #cbdceb; color: var(--primary); margin-top: 2px; }
         
         .collapsible-content { display: none; }
         .open > .collapsible-content { display: block; }
@@ -48,19 +48,20 @@
         .share-tag { font-size: 0.6rem; color: #1597BB; font-weight: bold; margin-left: 5px; }
         .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 1px 6px; border-radius: 10px; font-size: 0.6rem; position: absolute; right: 10px; top: 10px; }
         
-        #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; background: rgba(0,0,0,0.85); color: white; padding: 25px; border-radius: 15px; display: none; text-align: center; }
-
-        /* 세모 마커 (그림자 추가로 입체감 형성) */
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: bold; }
         .custom-triangle svg { filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.2)); display: block; overflow: visible; }
     </style>
 </head>
 <body>
 
-<div id="loading">📡 데이터를 동기화 중입니다...<br><small style="color:#FFD700">Created by JS KIM of LAM</small></div>
+<div id="loading-overlay">
+    <div style="font-size:1.6rem; color:#0A2647; margin-bottom:15px;">📡 LAM GLOBAL INTEL SYNCING...</div>
+    <div style="font-size:1.2rem; color:#D35400;">CREATED BY JS KIM OF LAM</div>
+</div>
 
 <div id="layout">
     <div id="sidebar">
-        <button id="toggle-btn" onclick="document.getElementById('sidebar').classList.toggle('hidden')">☰</button>
+        <button id="toggle-btn" onclick="document.getElementById('sidebar').classList.toggle('hidden')">📊</button>
         <div class="product-tabs">
             <button class="tab-btn active" id="btn-SM" onclick="switchProduct('SM')">SM</button>
             <button class="tab-btn" id="btn-AN" onclick="switchProduct('AN')">AN</button>
@@ -68,35 +69,23 @@
         </div>
         <div class="header">
             <span class="created-by">CREATED BY JS KIM OF LAM</span>
-            <h1 id="prod-title" onclick="resetMap()" title="전체 지도로 리셋">Global Supply Control Map</h1>
+            <h1 id="prod-title" onclick="resetToGlobal()" title="전체 지도로 리셋">Global Supply Control Map</h1>
         </div>
         
         <div class="metrics-grid">
-            <div class="metric-box">
-                <span class="metric-label">GLOBAL CAPA (K)</span>
-                <span class="metric-value" id="global-val">0</span>
-            </div>
-            <div class="metric-box">
-                <span class="metric-label">TOTAL SITES</span>
-                <span class="metric-value" id="total-sites">0</span>
-            </div>
-            <div class="metric-box" style="background: #1A1A1B;">
-                <span class="metric-label">CUR. LOSS RATIO</span>
-                <span class="metric-value" id="cur-ratio" style="color:#E74C3C">0%</span>
-            </div>
-            <div class="metric-box" style="background: #D35400;">
-                <span class="metric-label">FUT. LOSS RATIO</span>
-                <span class="metric-value" id="fut-ratio" style="color:#F1C40F">0%</span>
-            </div>
+            <div class="metric-box"><span class="metric-label">GLOBAL CAPA (K)</span><span class="metric-value" id="global-val">0</span></div>
+            <div class="metric-box"><span class="metric-label">TOTAL SITES</span><span class="metric-value" id="total-sites">0</span></div>
+            <div class="metric-box" style="background: #1A1A1B;"><span class="metric-label">CUR. LOSS RATIO</span><span class="metric-value" id="cur-ratio" style="color:#E74C3C">0%</span></div>
+            <div class="metric-box" style="background: #D35400;"><span class="metric-label">FUT. LOSS RATIO</span><span class="metric-value" id="fut-ratio" style="color:#F1C40F">0%</span></div>
         </div>
 
         <div id="list-container">
             <div id="current-risk-group" class="open">
-                <div class="group-header risk-header-current" onclick="this.parentElement.classList.toggle('open')"><span>⚠️ CURRENT RISK</span><span id="cur-sum-h" style="font-size:0.65rem;">0K Loss</span></div>
+                <div class="group-header risk-header-current" onclick="this.parentElement.classList.toggle('open')"><span>⚠️ CURRENT RISK</span><span id="cur-sum-h" style="font-size:0.65rem;"></span></div>
                 <div class="collapsible-content" id="current-risk-list"></div>
             </div>
             <div id="future-risk-group" class="open">
-                <div class="group-header risk-header-future" onclick="this.parentElement.classList.toggle('open')"><span>📅 FUTURE MAINT</span><span id="fut-sum-h" style="font-size:0.65rem;">0K Loss</span></div>
+                <div class="group-header risk-header-future" onclick="this.parentElement.classList.toggle('open')"><span>📅 FUTURE MAINT</span><span id="fut-sum-h" style="font-size:0.65rem;"></span></div>
                 <div class="collapsible-content" id="future-risk-list"></div>
             </div>
             <div style="background: var(--primary); color:white; padding:10px 12px; font-size:0.75rem; font-weight:bold; margin-top:10px;">🌐 REGIONAL DIRECTORY</div>
@@ -114,88 +103,46 @@
         'BD': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=607848019&single=true&output=csv'
     };
 
-    const map = L.map('map', {zoomControl: false, zoomAnimation: true, zoomSnap: 0.1}).setView([20, 100], 3);
+    const regionStyles = {
+        "NEA": { fill: "#5DADE2", border: "#2E86C1" }, "SEA": { fill: "#48C9B0", border: "#16A085" }, "NA": { fill: "#52BE80", border: "#1E8449" }, "WE": { fill: "#AF7AC5", border: "#7D3C98" },
+        "CE": { fill: "#9B59B6", border: "#6C3483" }, "CIS": { fill: "#EB984E", border: "#A04000" }, "ME": { fill: "#EC7063", border: "#B03A2E" }, "AFRICA": { fill: "#A04000", border: "#5D2300" },
+        "SA": { fill: "#58D68D", border: "#239B56" }, "IND": { fill: "#F4D03F", border: "#B7950B" }, "Other": { fill: "#BDC3C7", border: "#7F8C8D" }
+    };
+
+    const map = L.map('map', {zoomControl: false, zoomAnimation: true}).setView([20, 100], 3);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
 
     let activeMarkers = [];
 
-    function resetMap() { map.flyTo([20, 100], 3, { duration: 1.5, easeLinearity: 0.25 }); }
-
-    // 지역별 톤온톤 스타일 (채우기 & 더 진한 테두리)
-    const regionStyles = {
-        "NEA": { fill: "#5DADE2", border: "#2E86C1" },
-        "SEA": { fill: "#48C9B0", border: "#16A085" },
-        "NA": { fill: "#52BE80", border: "#1E8449" },
-        "WE": { fill: "#AF7AC5", border: "#7D3C98" },
-        "CE": { fill: "#9B59B6", border: "#6C3483" },
-        "CIS": { fill: "#EB984E", border: "#A04000" },
-        "ME": { fill: "#EC7063", border: "#B03A2E" },
-        "AFRICA": { fill: "#A04000", border: "#5D2300" },
-        "SA": { fill: "#58D68D", border: "#239B56" },
-        "IND": { fill: "#F4D03F", border: "#B7950B" },
-        "Other": { fill: "#BDC3C7", border: "#7F8C8D" }
-    };
-
-    function parseCSV(csv) {
-        const lines = csv.split("\n").map(l => l.trim()).filter(l => l.length > 0);
-        const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
-        return lines.slice(1).map(line => {
-            const values = line.split(",");
-            let obj = {};
-            headers.forEach((h, i) => {
-                let val = values[i] ? values[i].trim() : "";
-                if (["capacity", "lat", "lng", "days"].includes(h)) val = parseFloat(val.replace(/[^0-9.-]/g, "")) || 0;
-                obj[h] = val;
-            });
-            return obj;
-        });
+    // ★ 오프셋 정중앙 이동 함수 ★
+    function moveToPlant(lat, lng) {
+        const offset = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360;
+        const targetPoint = map.project([lat, lng], 9).subtract([offset / 2, 0]);
+        map.flyTo(map.unproject(targetPoint, 9), 9, { duration: 1.5 });
     }
+
+    function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.5 }); }
 
     async function switchProduct(prod) {
-        document.getElementById('loading').style.display = 'block';
+        document.getElementById('loading-overlay').style.display = 'flex';
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.getElementById('btn-' + prod).classList.add('active');
-        try {
-            const response = await fetch(sheetURLs[prod] + "&t=" + new Date().getTime());
-            const csvText = await response.text();
-            const data = parseCSV(csvText);
-            document.getElementById('btn-' + prod).innerText = `${prod} (${data.length})`;
-            renderEverything(data, prod);
-        } catch (e) { console.error(e); }
-        finally { document.getElementById('loading').style.display = 'none'; }
-    }
 
-    function createMarker(p, isCur, isFut, globalCapa) {
-        const baseSize = Math.sqrt(p.capacity) * 0.55; // 기존 대비 30% 축소 유지
-
-        if (isCur || isFut) {
-            const color = isCur ? '#1A1A1B' : '#D35400';
-            const strokeColor = isCur ? 'none' : '#8E44AD'; // 보수는 독보적인 보라빛 테두리 혹은 진한 오렌지
-            const iconSize = baseSize * 2.2;
-            
-            const icon = L.divIcon({
-                html: `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24">
-                         <path d="M12 2L2 22H22L12 2Z" fill="${color}" stroke="${isCur?'none':'#A04000'}" stroke-width="${isCur?0:2}"/>
-                       </svg>`,
-                className: 'custom-triangle',
-                iconSize: [iconSize, iconSize], iconAnchor: [iconSize / 2, iconSize / 2]
-            });
-            const marker = L.marker([p.lat, p.lng], { icon: icon });
-            marker.on('click', (e) => map.flyTo(e.latlng, 8, { duration: 1.5, easeLinearity: 0.25 }));
-            return marker;
-        } else {
-            const style = Object.entries(regionStyles).find(([k]) => p.region && p.region.includes(k))?.[1] || regionStyles.Other;
-            const marker = L.circleMarker([p.lat, p.lng], {
-                radius: baseSize,
-                fillColor: style.fill,
-                color: style.border,
-                weight: 1.5,
-                fillOpacity: 0.85,
-                stroke: true
-            });
-            marker.on('click', (e) => map.flyTo(e.latlng, 8, { duration: 1.5, easeLinearity: 0.25 }));
-            return marker;
-        }
+        Papa.parse(sheetURLs[prod] + "?t=" + new Date().getTime(), {
+            download: true, header: true, dynamicTyping: true, skipEmptyLines: true,
+            complete: function(results) {
+                // 데이터 정규화 (대소문자 무시)
+                const data = results.data.map(row => {
+                    let newRow = {};
+                    for (let key in row) { newRow[key.toLowerCase().trim()] = row[key]; }
+                    return newRow;
+                }).filter(row => row.company || row.region);
+                
+                document.getElementById('btn-' + prod).innerText = `${prod} (${data.length})`;
+                renderEverything(data, prod);
+                setTimeout(() => { document.getElementById('loading-overlay').style.display = 'none'; }, 600);
+            }
+        });
     }
 
     function renderEverything(data, prodName) {
@@ -205,7 +152,7 @@
         document.getElementById('future-risk-list').innerHTML = '';
         document.getElementById('region-list').innerHTML = '';
 
-        const globalTotalCapa = data.reduce((s, p) => s + p.capacity, 0);
+        const globalTotalCapa = data.reduce((s, p) => s + (Number(p.capacity) || 0), 0);
         document.getElementById('global-val').innerText = Math.round(globalTotalCapa).toLocaleString();
         document.getElementById('total-sites').innerText = data.length;
 
@@ -213,25 +160,51 @@
         const regions = {};
 
         data.forEach(p => {
-            const isCur = p.status && p.status.includes('Current');
-            const isFut = p.status && p.status.includes('Future');
-            const loss = ((p.capacity / 365) * (p.days || 0)).toFixed(1);
+            const lat = p.lat; const lng = p.lng;
+            if(!lat || !lng) return;
+
+            const capa = Number(p.capacity) || 0;
+            const days = Number(p.days) || 0;
+            const status = p.status || "Normal";
+            const isCur = status.includes('Current');
+            const isFut = status.includes('Future');
+            const loss = ((capa / 365) * days).toFixed(1);
             
             if(isCur) curLoss += parseFloat(loss);
             if(isFut) futLoss += parseFloat(loss);
 
-            const marker = createMarker(p, isCur, isFut, globalTotalCapa).addTo(map);
-            marker.bindPopup(`<b>${p.company}</b><br>${p.location}<br>Capa: ${p.capacity}K<br>Status: ${p.status}`);
+            // 마커 생성 (크기 30% 축소 적용)
+            let marker;
+            const baseSize = Math.sqrt(capa) * 0.55;
+            if (isCur || isFut) {
+                const color = isCur ? '#1A1A1B' : '#D35400';
+                const iconSize = baseSize * 2.2;
+                marker = L.marker([lat, lng], {
+                    icon: L.divIcon({
+                        html: `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="${color}" stroke="${isCur?'none':'#A04000'}" stroke-width="${isCur?0:2}"/></svg>`,
+                        className: 'custom-triangle', iconSize: [iconSize, iconSize], iconAnchor: [iconSize/2, iconSize/2]
+                    })
+                }).addTo(map);
+            } else {
+                const regKey = Object.keys(regionStyles).find(k => (p.region || "").includes(k)) || "Other";
+                const style = regionStyles[regKey] || regionStyles.Other;
+                marker = L.circleMarker([lat, lng], {
+                    radius: baseSize, fillColor: style.fill, color: style.border, weight: 1.5, fillOpacity: 0.85, stroke: true
+                }).addTo(map);
+            }
+            
+            marker.bindPopup(`<b>${p.company}</b><br>Capa: ${capa}K<br>Status: ${status}`);
+            marker.on('click', () => moveToPlant(lat, lng));
             activeMarkers.push(marker);
+            p._m = marker;
 
+            // 카드 리스트
             const createCard = (showShare = true) => {
-                const share = ((p.capacity / globalTotalCapa) * 100).toFixed(1);
+                const share = ((capa / globalTotalCapa) * 100).toFixed(1);
                 const card = document.createElement('div');
                 card.className = `plant-card ${isCur?'current-risk':(isFut?'future-risk':'')}`;
-                card.innerHTML = `${isCur||isFut ? '<span class="loss-badge">'+loss+'K Loss</span>' : ''}
-                                  <b>${p.company}</b>${showShare ? '<span class="share-tag">('+share+'%)</span>' : ''}
-                                  <div class="capa-info">${p.capacity}K MT | ${p.status}</div>`;
-                card.onclick = () => { map.flyTo([p.lat, p.lng], 8, { duration: 1.5 }); marker.openPopup(); };
+                card.innerHTML = `${(isCur||isFut) ? `<span class="loss-badge">${loss}K Loss</span>` : ''}<b>${p.company}</b>${showShare ? `<span class="share-tag">(${share}%)</span>` : ''}<div class="capa-info">${capa}K MT | ${status}</div>`;
+                card.onclick = () => { moveToPlant(lat, lng); setTimeout(() => p._m.openPopup(), 1500); };
                 return card;
             };
 
@@ -244,33 +217,32 @@
             if (!regions[reg].countries[cou]) regions[reg].countries[cou] = [];
             regions[reg].countries[cou].push(createCard(true));
             regions[reg].totalPlants++;
-            regions[reg].totalCapa += p.capacity;
+            regions[reg].totalCapa += capa;
         });
 
-        document.getElementById('cur-ratio').innerText = ((curLoss / globalTotalCapa) * 100).toFixed(2) + "%";
-        document.getElementById('fut-ratio').innerText = ((futLoss / globalTotalCapa) * 100).toFixed(2) + "%";
-        document.getElementById('cur-sum-h').innerText = curLoss.toFixed(1) + "K Loss";
-        document.getElementById('fut-sum-h').innerText = futLoss.toFixed(1) + "K Loss";
+        // 지표 업데이트
+        document.getElementById('cur-ratio').innerText = globalTotalCapa > 0 ? ((curLoss / globalTotalCapa) * 100).toFixed(2) + "%" : "0%";
+        document.getElementById('fut-ratio').innerText = globalTotalCapa > 0 ? ((futLoss / globalTotalCapa) * 100).toFixed(2) + "%" : "0%";
+        document.getElementById('cur-sum-h').innerText = curLoss.toFixed(1) + "K Loss ▼";
+        document.getElementById('fut-sum-h').innerText = futLoss.toFixed(1) + "K Loss ▼";
 
+        // 지역별 아코디언
         Object.values(regions).sort((a,b) => b.totalPlants - a.totalPlants).forEach(r => {
-            const rShare = ((r.totalCapa / globalTotalCapa) * 100).toFixed(1);
+            const rShare = globalTotalCapa > 0 ? ((r.totalCapa / globalTotalCapa) * 100).toFixed(1) : 0;
             const rDiv = document.createElement('div');
-            rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open')">
-                                <span>${r.name} (${r.totalPlants})<br>
-                                <small style="font-weight:normal; font-size:0.6rem; opacity:0.8;">${Math.round(r.totalCapa).toLocaleString()}K (${rShare}%)</small></span>
-                                <span>▾</span></div>`;
-            const rCont = document.createElement('div'); rCont.className = 'collapsible-content';
+            rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open')"><span>${r.name} (${r.totalPlants})<br><small style="font-weight:normal; font-size:0.6rem; opacity:0.8;">${Math.round(r.totalCapa).toLocaleString()}K (${rShare}%)</small></span><span>▼</span></div><div class="collapsible-content"></div>`;
+            const rCont = rDiv.querySelector('.collapsible-content');
             Object.keys(r.countries).sort().forEach(c => {
                 const cDiv = document.createElement('div');
-                cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open')"><span>${c} (${r.countries[c].length})</span></div>`;
-                const cCont = document.createElement('div'); cCont.className = 'collapsible-content';
+                cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open')"><span>${c} (${r.countries[c].length})</span><span>▼</span></div><div class="collapsible-content"></div>`;
+                const cCont = cDiv.querySelector('.collapsible-content');
                 r.countries[c].forEach(card => cCont.appendChild(card));
-                cDiv.appendChild(cCont); rCont.appendChild(cDiv);
+                rCont.appendChild(cDiv);
             });
-            rDiv.appendChild(rCont);
             document.getElementById('region-list').appendChild(rDiv);
         });
     }
+
     window.onload = () => switchProduct('SM');
 </script>
 </body>
