@@ -4,14 +4,15 @@
     <meta charset="UTF-8">
     <title>Global Chemical Control Tower | JS KIM</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         :root { --primary: #0A2647; --accent: #1597BB; --current: #1A1A1B; --future: #D35400; --bg: #F0F5F9; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Pretendard', sans-serif; overflow: hidden; }
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
         #map { flex-grow: 1; height: 100%; background: #DAEAF1; z-index: 1; }
         
-        /* ★ 핵심: 마커와 팝업의 개별 애니메이션을 완전히 죽여서 지도와 동기화 ★ */
-        .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-popup, .leaflet-zoom-animated { 
+        /* ★ 핵심: 모든 개별 애니메이션을 제거하여 지도와 100% 동기화 ★ */
+        .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-zoom-animated, .leaflet-popup { 
             transition: none !important; 
             will-change: transform; 
         }
@@ -25,9 +26,8 @@
         .tab-btn.active { background: var(--accent); color: white; }
         
         .header { background: var(--primary); color: white; padding: 22px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        /* 제작자 문구: 노란색 강조, 30% 확대 */
+        /* 제작자 문구: 노란색 강조, 크게 유지 */
         .created-by { font-size: 1.3rem; color: #FFD700; font-weight: 900; margin-bottom: 12px; display: block; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
-        
         #prod-title { margin: 0; font-size: 1.25rem; letter-spacing: -0.5px; cursor: pointer; }
 
         .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; background: var(--accent); color: white; gap: 1px; }
@@ -104,29 +104,32 @@
         "SA": { fill: "#58D68D", border: "#239B56" }, "IND": { fill: "#F4D03F", border: "#B7950B" }, "Other": { fill: "#BDC3C7", border: "#7F8C8D" }
     };
 
-    const map = L.map('map', {zoomControl: false, zoomAnimation: true, markerZoomAnimation: false}).setView([20, 100], 3);
+    const map = L.map('map', {zoomControl: false, zoomAnimation: true}).setView([20, 100], 3);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
 
     let activeMarkers = [];
 
-    // ★ 묵직하고 부드러운 오프셋 이동 로직 ★
+    // ★ 오프셋 정중앙 이동 & 안착 후 팝업 로직 ★
     function moveToPlant(lat, lng, marker) {
         const offset = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360;
-        const targetPoint = map.project([lat, lng], 9).subtract([offset / 2, 0]);
         
-        // 2.5초 동안 아주 부드럽게 이동
-        map.flyTo(map.unproject(targetPoint, 9), 9, { 
-            duration: 2.5, 
-            easeLinearity: 0.1 
+        // 줌 레벨을 9에서 7로 하향 조정 (사장님 요청)
+        const zoomLevel = 7;
+        const targetPoint = map.project([lat, lng], zoomLevel).subtract([offset / 2, 0]);
+        
+        // 이동 애니메이션 설정
+        map.flyTo(map.unproject(targetPoint, zoomLevel), zoomLevel, { 
+            duration: 1.5, 
+            easeLinearity: 0.25 
         });
 
-        // 이동이 완전히 끝난 후 팝업 오픈 (불일치 방지)
+        // 지도가 멈추면 그때 팝업을 띄움 (불일치 완전 방지)
         map.once('moveend', () => {
             if(marker) marker.openPopup();
         });
     }
 
-    function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.5 }); }
+    function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
 
     function parseCSV(csv) {
         const lines = csv.split("\n").map(l => l.trim()).filter(l => l.length > 0);
