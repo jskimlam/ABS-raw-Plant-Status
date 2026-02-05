@@ -43,6 +43,9 @@
         
         .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 1px 6px; border-radius: 10px; font-size: 0.6rem; position: absolute; right: 10px; top: 10px; }
         #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; background: rgba(0,0,0,0.85); color: white; padding: 25px; border-radius: 15px; display: none; text-align: center; }
+
+        /* 세모 마커용 스타일 */
+        .custom-marker-triangle svg { filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.2)); }
     </style>
 </head>
 <body>
@@ -103,6 +106,13 @@
 
     let activeMarkers = [];
 
+    // 지역별 색상 팔레트 (세련된 파스텔톤, 검정/주황 제외)
+    const regionColors = {
+        "NEA": "#64B5F6", "SEA": "#4DB6AC", "NA": "#81C784", "WE": "#BA68C8", 
+        "CE": "#9575CD", "CIS": "#F06292", "ME": "#E57373", "AFRICA": "#A1887F", 
+        "SA": "#AED581", "IND": "#FFB74D", "Other": "#B0BEC5"
+    };
+
     function parseCSV(csv) {
         const lines = csv.split("\n").map(l => l.trim()).filter(l => l.length > 0);
         const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
@@ -138,6 +148,38 @@
         }
     }
 
+    // 커스텀 마커 생성 함수
+    function createMarker(p, isCur, isFut) {
+        const size = Math.sqrt(p.capacity) * 0.7;
+        let marker;
+
+        if (isCur || isFut) {
+            // 세모 마커 (SVG 사용)
+            const color = isCur ? '#1A1A1B' : '#F1C40F';
+            const iconSize = size * 2.5; // 세모는 조금 더 크게
+            const svgIcon = L.divIcon({
+                html: `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                         <path d="M12 2L2 22H22L12 2Z" fill="${color}"/>
+                       </svg>`,
+                className: 'custom-marker-triangle',
+                iconSize: [iconSize, iconSize],
+                iconAnchor: [iconSize / 2, iconSize / 2]
+            });
+            marker = L.marker([p.lat, p.lng], { icon: svgIcon });
+        } else {
+            // 정상 마커 (동그라미, 지역별 색상, 테두리 없음)
+            const regionKey = Object.keys(regionColors).find(key => p.region && p.region.includes(key)) || "Other";
+            marker = L.circleMarker([p.lat, p.lng], {
+                radius: size,
+                fillColor: regionColors[regionKey],
+                color: 'none', // 테두리 색상 없음
+                stroke: false, // 테두리 선 그리지 않음
+                fillOpacity: 0.8
+            });
+        }
+        return marker;
+    }
+
     function renderEverything(data, prodName) {
         activeMarkers.forEach(m => map.removeLayer(m));
         activeMarkers = [];
@@ -162,12 +204,9 @@
             if(isCur) curLoss += parseFloat(loss);
             if(isFut) futLoss += parseFloat(loss);
 
-            const color = isCur ? '#1A1A1B' : (isFut ? '#F1C40F' : '#1597BB');
-            const marker = L.circleMarker([p.lat, p.lng], {
-                radius: Math.sqrt(p.capacity) * 0.7,
-                fillColor: color, color: '#fff', weight: isCur || isFut ? 3 : 1, fillOpacity: 0.8
-            }).addTo(map);
-            marker.bindPopup(`<b>${p.company}</b><br>${p.location}<br>Capa: ${p.capacity}K (${share}%)<br>Status: ${p.status}`);
+            // 마커 생성 및 지도에 추가
+            const marker = createMarker(p, isCur, isFut).addTo(map);
+            marker.bindPopup(`<b>${p.company}</b><br>${p.location}<br>Capa: ${p.capacity}K (${share}%)<br>Status: ${p.status}<br>Region: ${p.region}`);
             activeMarkers.push(marker);
 
             const createCard = (showShare = true) => {
@@ -191,7 +230,6 @@
             regions[reg].totalPlants++;
         });
 
-        // 지역별 업체 수 기준 내림차순 정렬
         const sortedRegions = Object.values(regions).sort((a, b) => b.totalPlants - a.totalPlants);
 
         sortedRegions.forEach(r => {
