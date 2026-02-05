@@ -11,23 +11,14 @@
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
         #map { flex-grow: 1; height: 100%; background: #DAEAF1; z-index: 1; }
         
-        /* ★ 핵심 튜닝: 줌 시 마커 미세 울렁거림 완벽 차단 ★ */
+        /* 마커 고정 및 동기화 설정 */
         .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-popup { 
-            /* GPU 가속 강제 및 뒷면 렌더링 방지로 깜빡임 제거 */
             -webkit-backface-visibility: hidden;
             backface-visibility: hidden;
             will-change: transform;
-            /* 어떤 상황에서도 트랜지션 금지 */
             transition: none !important; 
         }
         
-        /* 지도가 줌 되는 그 찰나의 순간에도 마커 변형 절대 금지 */
-        .leaflet-zoom-anim .leaflet-marker-icon, 
-        .leaflet-zoom-anim .leaflet-marker-shadow {
-            transition: none !important;
-            transform-origin: 50% 50%;
-        }
-
         #sidebar { position: absolute; left: 0; top: 0; width: 360px; height: 100%; background: white; z-index: 2000; transition: transform 0.4s ease; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
         #sidebar.hidden { transform: translateX(-100%); }
         #toggle-btn { position: absolute; right: -45px; top: 20px; width: 45px; height: 45px; background: var(--primary); color: white; border: none; cursor: pointer; border-radius: 0 8px 8px 0; font-size: 18px; z-index: 2001; }
@@ -37,7 +28,6 @@
         .tab-btn.active { background: var(--accent); color: white; }
         
         .header { background: var(--primary); color: white; padding: 22px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        /* 제작자 문구: 노란색 강조, 크게 유지 */
         .created-by { font-size: 1.3rem; color: #FFD700; font-weight: 900; margin-bottom: 12px; display: block; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
         #prod-title { margin: 0; font-size: 1.25rem; letter-spacing: -0.5px; cursor: pointer; }
 
@@ -47,8 +37,12 @@
         .metric-value { font-size: 0.95rem; font-weight: bold; }
 
         #list-container { flex-grow: 1; overflow-y: auto; background: var(--bg); }
-        .group-header { padding: 12px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.8rem; align-items: center; }
+        .group-header { padding: 14px 12px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.85rem; align-items: center; line-height: 1.5; }
         .region-header { background: #cbdceb; color: var(--primary); margin-top: 2px; }
+        .country-header { background: #e8eff5; font-size: 0.75rem; padding-left: 20px; }
+        
+        /* 분석 숫자 스타일 (요청대로 2배 크기 적용) */
+        .header-stats { font-weight: normal; font-size: 1.1rem; color: #E74C3C; display: block; margin-top: 4px; }
         
         .collapsible-content { display: none; }
         .open > .collapsible-content { display: block; }
@@ -87,11 +81,11 @@
 
         <div id="list-container">
             <div id="current-risk-group" class="open">
-                <div class="group-header risk-header-current" style="background:var(--current); color:white" onclick="this.parentElement.classList.toggle('open')"><span>⚠️ CURRENT RISK</span><span id="cur-sum-h" style="font-size:0.65rem;"></span></div>
+                <div class="group-header" style="background:var(--current); color:white" onclick="this.parentElement.classList.toggle('open')"><span>⚠️ CURRENT RISK</span><span id="cur-sum-h" style="font-size:0.65rem;"></span></div>
                 <div class="collapsible-content" id="current-risk-list"></div>
             </div>
             <div id="future-risk-group" class="open">
-                <div class="group-header risk-header-future" style="background:var(--future); color:white" onclick="this.parentElement.classList.toggle('open')"><span>📅 FUTURE MAINT</span><span id="fut-sum-h" style="font-size:0.65rem;"></span></div>
+                <div class="group-header" style="background:var(--future); color:white" onclick="this.parentElement.classList.toggle('open')"><span>📅 FUTURE MAINT</span><span id="fut-sum-h" style="font-size:0.65rem;"></span></div>
                 <div class="collapsible-content" id="future-risk-list"></div>
             </div>
             <div style="background: var(--primary); color:white; padding:10px 12px; font-size:0.75rem; font-weight:bold; margin-top:10px;">🌐 REGIONAL DIRECTORY</div>
@@ -115,26 +109,17 @@
         "SA": { fill: "#58D68D", border: "#239B56" }, "IND": { fill: "#F4D03F", border: "#B7950B" }, "Other": { fill: "#BDC3C7", border: "#7F8C8D" }
     };
 
-    // 마커 줌 애니메이션 원천 차단 (markerZoomAnimation: false)
     const map = L.map('map', {zoomControl: false, zoomAnimation: true, markerZoomAnimation: false}).setView([20, 100], 3);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
 
     let activeMarkers = [];
 
-    // 부드러운 이동 및 안착 후 팝업
     function moveToPlant(lat, lng, marker) {
         const offset = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360;
         const zoomLevel = 7;
         const targetPoint = map.project([lat, lng], zoomLevel).subtract([offset / 2, 0]);
-        
-        map.flyTo(map.unproject(targetPoint, zoomLevel), zoomLevel, { 
-            duration: 1.5, 
-            easeLinearity: 0.25 
-        });
-
-        map.once('moveend', () => {
-            if(marker) marker.openPopup();
-        });
+        map.flyTo(map.unproject(targetPoint, zoomLevel), zoomLevel, { duration: 1.5, easeLinearity: 0.25 });
+        map.once('moveend', () => { if(marker) marker.openPopup(); });
     }
 
     function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
@@ -195,11 +180,10 @@
             const baseSize = Math.sqrt(p.capacity) * 0.55;
             if (isCur || isFut) {
                 const color = isCur ? '#1A1A1B' : '#D35400';
-                const iconSize = baseSize * 2.2;
                 marker = L.marker([p.lat, p.lng], {
                     icon: L.divIcon({
-                        html: `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="${color}" stroke="${isCur?'none':'#A04000'}" stroke-width="${isCur?0:2}"/></svg>`,
-                        className: 'custom-triangle', iconSize: [iconSize, iconSize], iconAnchor: [iconSize/2, iconSize/2]
+                        html: `<svg width="${baseSize*2.2}" height="${baseSize*2.2}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="${color}" stroke="${isCur?'none':'#A04000'}" stroke-width="${isCur?0:2}"/></svg>`,
+                        className: 'custom-triangle', iconSize: [baseSize*2.2, baseSize*2.2], iconAnchor: [baseSize*1.1, baseSize*1.1]
                     })
                 }).addTo(map);
             } else {
@@ -211,10 +195,7 @@
             }
             
             marker.bindPopup(`<b>${p.company}</b><br>Capa: ${p.capacity}K<br>Status: ${p.status}`);
-            marker.on('click', (e) => {
-                L.DomEvent.stopPropagation(e);
-                moveToPlant(p.lat, p.lng, marker);
-            });
+            marker.on('click', (e) => { L.DomEvent.stopPropagation(e); moveToPlant(p.lat, p.lng, marker); });
             activeMarkers.push(marker);
             p._m = marker;
 
@@ -233,8 +214,10 @@
             const reg = p.region || "Unknown";
             const cou = p.country || "Other";
             if (!regions[reg]) regions[reg] = { name: reg, countries: {}, totalPlants: 0, totalCapa: 0 };
-            if (!regions[reg].countries[cou]) regions[reg].countries[cou] = [];
-            regions[reg].countries[cou].push(createCard(true));
+            if (!regions[reg].countries[cou]) regions[reg].countries[cou] = { plants: [], countryCapa: 0 };
+            
+            regions[reg].countries[cou].plants.push(createCard(true));
+            regions[reg].countries[cou].countryCapa += p.capacity;
             regions[reg].totalPlants++;
             regions[reg].totalCapa += p.capacity;
         });
@@ -244,16 +227,27 @@
         document.getElementById('cur-sum-h').innerText = curLoss.toFixed(1) + "K Loss ▼";
         document.getElementById('fut-sum-h').innerText = futLoss.toFixed(1) + "K Loss ▼";
 
+        // 지역별 및 국가별 정렬/렌더링
         Object.values(regions).sort((a,b) => b.totalPlants - a.totalPlants).forEach(r => {
             const rShare = globalTotalCapa > 0 ? ((r.totalCapa / globalTotalCapa) * 100).toFixed(1) : 0;
             const rDiv = document.createElement('div');
-            rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open')"><span>${r.name} (${r.totalPlants})<br><small style="font-weight:normal; font-size:0.6rem; opacity:0.8;">${Math.round(r.totalCapa).toLocaleString()}K (${rShare}%)</small></span><span>▼</span></div><div class="collapsible-content"></div>`;
+            rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open')">
+                                <span>${r.name} (${r.totalPlants})
+                                <span class="header-stats">${Math.round(r.totalCapa).toLocaleString()}K (${rShare}%)</span></span>
+                                <span>▼</span></div><div class="collapsible-content"></div>`;
             const rCont = rDiv.querySelector('.collapsible-content');
+
             Object.keys(r.countries).sort().forEach(c => {
+                const cData = r.countries[c];
+                const cShare = globalTotalCapa > 0 ? ((cData.countryCapa / globalTotalCapa) * 100).toFixed(1) : 0;
                 const cDiv = document.createElement('div');
-                cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open')"><span>${c} (${r.countries[c].length})</span><span>▼</span></div><div class="collapsible-content"></div>`;
+                cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open')">
+                                    <span>${c} (${cData.plants.length})
+                                    <span class="header-stats" style="font-size:0.95rem; color:#1597BB;">${Math.round(cData.countryCapa).toLocaleString()}K (${cShare}%)</span></span>
+                                    <span>▼</span></div><div class="collapsible-content"></div>`;
                 const cCont = cDiv.querySelector('.collapsible-content');
-                r.countries[c].forEach(card => cCont.appendChild(card));
+                cData.plants.forEach(card => cCont.appendChild(card));
+                cDiv.appendChild(cCont);
                 rCont.appendChild(cDiv);
             });
             document.getElementById('region-list').appendChild(rDiv);
