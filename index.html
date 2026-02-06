@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v9.6)</title>
+    <title>Global Supply Control Tower | JS KIM (v9.7)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="data/data_sm.js"></script>
     <script src="data/data_an.js"></script>
@@ -47,6 +47,7 @@
         #admin-password { width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid var(--primary); border-radius: 8px; box-sizing: border-box; font-weight: bold; font-size: 1rem; text-align: center; }
         #data-input-section { display: none; border-top: 2px dashed #eee; padding-top: 15px; margin-top: 10px; }
         
+        /* 동기화 오버레이 스타일 */
         #sync-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 38, 71, 0.97); z-index: 10000; display: none; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; transition: opacity 0.4s ease; }
         .sync-spinner { width: 45px; height: 45px; border: 4px solid rgba(255,255,255,0.2); border-top: 4px solid #FFD700; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -113,7 +114,7 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    const ADMIN_PASS = "jskim0111"; //
+    const ADMIN_PASS = "jskim0111";
     const SHEET_URLS = { 'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv', 'AN': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=263516767&single=true&output=csv', 'BD': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=607848019&single=true&output=csv' };
     let currentProd = 'SM';
     const map = L.map('map', {zoomControl: false, zoomAnimation: true, markerZoomAnimation: false}).setView([20, 100], 3);
@@ -123,14 +124,7 @@
     function showUpdateModal() { document.getElementById('admin-password').value = ""; document.getElementById('auth-section').style.display = 'block'; document.getElementById('data-input-section').style.display = 'none'; document.getElementById('update-modal').style.display = 'block'; }
     function closeModal() { document.getElementById('update-modal').style.display = 'none'; }
     function verifyAdmin() { if (document.getElementById('admin-password').value === ADMIN_PASS) { document.getElementById('auth-section').style.display = 'none'; document.getElementById('data-input-section').style.display = 'block'; } else { alert("❌ 보안 경고: 암호 불일치."); } }
-    
-    function saveManualData() {
-        const input = document.getElementById('csv-input').value;
-        const parsed = parseUniversal(input);
-        if(parsed.length > 0) { localStorage.setItem(`MANUAL_DATA_${currentProd}`, JSON.stringify(parsed)); alert(`✅ ${currentProd} 저장 완료.`); closeModal(); renderEverything(parsed, currentProd); }
-        else { alert("데이터 형식을 확인하세요."); }
-    }
-
+    function saveManualData() { const input = document.getElementById('csv-input').value; const parsed = parseUniversal(input); if(parsed.length > 0) { localStorage.setItem(`MANUAL_DATA_${currentProd}`, JSON.stringify(parsed)); alert(`✅ ${currentProd} 저장 완료.`); closeModal(); renderEverything(parsed, currentProd); } else { alert("데이터 형식을 확인하세요."); } }
     function clearManualData() { if(confirm("메모리를 초기화하시겠습니까?")) { localStorage.removeItem(`MANUAL_DATA_${currentProd}`); location.reload(); } }
 
     function parseUniversal(text) {
@@ -157,23 +151,46 @@
         currentProd = prod;
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.getElementById('btn-' + prod).classList.add('active');
+        
+        // ★ 브리핑 오버레이 활성화 ★
         const overlay = document.getElementById('sync-overlay');
+        const mainText = document.getElementById('sync-main-text');
+        const subText = document.getElementById('sync-sub-text');
+        const icon = document.getElementById('sync-icon');
+        
         overlay.style.display = 'flex'; overlay.style.opacity = '1';
+        icon.className = "sync-spinner"; icon.innerHTML = "";
+        mainText.innerText = "동기화 시도 중...";
+        subText.innerText = "Attempting Online Sync...";
+
         try {
             const response = await fetch(SHEET_URLS[prod] + "&t=" + new Date().getTime());
             if (!response.ok) throw new Error("Blocked");
             const data = parseUniversal(await response.text());
+            
+            // ★ 온라인 연동 완료 보고 ★
+            mainText.innerText = "온라인 연동 완료";
+            subText.innerText = "Online Sync Complete";
+            icon.className = ""; icon.innerHTML = "<div style='font-size:50px;'>✅</div>";
+            
             document.getElementById('data-mode').innerText = "LIVE SYNC"; document.getElementById('data-mode').style.background = "#2ECC71";
             renderEverything(data, prod);
-            setTimeout(() => { overlay.style.opacity = '0'; setTimeout(() => { overlay.style.display = 'none'; }, 600); }, 800);
+            setTimeout(() => { overlay.style.opacity = '0'; setTimeout(() => { overlay.style.display = 'none'; }, 600); }, 1000);
         } catch (e) {
+            // ★ 보안 전환 보고 ★
+            icon.innerHTML = "";
+            mainText.innerText = "보안 확인: 픽스 모드로 전환";
+            mainText.style.color = "#FF4D4D";
+            subText.innerText = "Security Verified: Switching to Fixed Mode";
+            
             setTimeout(() => {
                 let data = []; const localData = localStorage.getItem(`MANUAL_DATA_${prod}`);
                 if (localData) { data = JSON.parse(localData); document.getElementById('data-mode').innerText = "MEMORY MODE"; }
                 else { try { if (prod === 'SM') data = (typeof data_sm !== 'undefined') ? data_sm : []; if (prod === 'AN') data = (typeof data_an !== 'undefined') ? data_an : []; if (prod === 'BD') data = (typeof data_bd !== 'undefined') ? data_bd : []; document.getElementById('data-mode').innerText = "FIXED MODE"; } catch(err) { console.error(err); } }
-                document.getElementById('data-mode').style.background = "#E74C3C"; renderEverything(data, prod);
-                setTimeout(() => { overlay.style.opacity = '0'; setTimeout(() => { overlay.style.display = 'none'; }, 600); }, 800);
-            }, 800);
+                document.getElementById('data-mode').style.background = "#E74C3C"; 
+                renderEverything(data, prod);
+                setTimeout(() => { overlay.style.opacity = '0'; setTimeout(() => { overlay.style.display = 'none'; mainText.style.color = "white"; }, 600); }, 1000);
+            }, 1000);
         }
     }
 
@@ -196,7 +213,6 @@
             marker.bindPopup(`<b>${p.company}</b><br>Capa: ${capa}K<br>Status: ${status}`); marker.on('click', (e) => { L.DomEvent.stopPropagation(e); flyToTarget(p.lat, p.lng, 7, marker); });
             activeMarkers.push(marker); p._m = marker;
 
-            // 계층 구조용 데이터 정리
             const reg = p.region || "Unknown"; const cou = p.country || "Other";
             if (!regions[reg]) regions[reg] = { name: reg, countries: {}, totalPlants: 0, totalCapa: 0, sumLat: 0, sumLng: 0 };
             if (!regions[reg].countries[cou]) regions[reg].countries[cou] = { name: cou, plants: [], countryCapa: 0, sumLat: 0, sumLng: 0 };
@@ -219,13 +235,12 @@
         document.getElementById('fut-ratio').innerText = globalTotalCapa > 0 ? ((futLoss/globalTotalCapa)*100).toFixed(2) + "%" : "0.00%";
         document.getElementById('cur-sum-h').innerText = curLoss.toFixed(1) + "K ▼"; document.getElementById('fut-sum-h').innerText = futLoss.toFixed(1) + "K ▼";
 
-        // ★ 계층형 리스트 렌더링 (Region -> Country -> Plant) ★
+        // 계층형 리스트 렌더링
         Object.values(regions).sort((a,b) => b.totalPlants - a.totalPlants).forEach(r => {
             const rDiv = document.createElement('div');
             rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${r.sumLat/r.totalPlants}, ${r.sumLng/r.totalPlants}, 4);">
                                 <span>${r.name} (${r.totalPlants}) <span class="header-stats" style="color:#C0392B;">${Math.round(r.totalCapa).toLocaleString()}K (${((r.totalCapa/globalTotalCapa)*100).toFixed(1)}%)</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
             const rCont = rDiv.querySelector('.collapsible-content');
-            
             Object.values(r.countries).sort((a,b) => b.countryCapa - a.countryCapa).forEach(c => {
                 const cDiv = document.createElement('div');
                 cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${c.sumLat/c.plants.length}, ${c.sumLng/c.plants.length}, 5.5);">
