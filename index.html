@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v10.0)</title>
+    <title>Global Supply Control Tower | JS KIM (v10.3)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="data/data_sm.js"></script>
     <script src="data/data_an.js"></script>
@@ -50,7 +50,6 @@
         #sync-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 38, 71, 0.97); z-index: 10000; display: none; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; transition: opacity 0.4s ease; }
         .sync-spinner { width: 45px; height: 45px; border: 4px solid rgba(255,255,255,0.2); border-top: 4px solid #FFD700; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .custom-triangle svg { filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.2)); display: block; }
     </style>
 </head>
 <body>
@@ -113,100 +112,68 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    const ADMIN_PASS = "jskim0111"; //
+    const ADMIN_PASS = "jskim0111";
     const SHEET_URLS = { 'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv', 'AN': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=263516767&single=true&output=csv', 'BD': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=607848019&single=true&output=csv' };
     
-    // ★ 다크모드 대응 보색 컬러 엔진 ★
-    const regionColors = {
-        light: { "NEA": "#5DADE2", "SEA": "#48C9B0", "NA": "#52BE80", "WE": "#AF7AC5", "CE": "#9B59B6", "CIS": "#EB984E", "ME": "#EC7063", "Other": "#BDC3C7" },
-        dark: { "NEA": "#00E5FF", "SEA": "#00FFC8", "NA": "#ADFF2F", "WE": "#F06292", "CE": "#E1BEE7", "CIS": "#FFB74D", "ME": "#FF8A65", "Other": "#FFFFFF" }
+    // ★ 대륙별 보색 컬러 엔진 최적화 (v10.3) ★
+    const regionColors = { 
+        light: { 
+            "NEA": "#5DADE2", "SEA": "#48C9B0", "NA": "#F39C12", "WE": "#8E44AD", "CE": "#E91E63", "CIS": "#16A085", "ME": "#D35400", "Other": "#BDC3C7" 
+        }, 
+        dark: { 
+            "NEA": "#00E5FF", "SEA": "#00FFC8", "NA": "#FFD600", "WE": "#E040FB", "CE": "#FF4081", "CIS": "#1DE9B6", "ME": "#FF6E40", "Other": "#FFFFFF" 
+        } 
     };
 
-    const layers = {
-        "Standard": L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'),
-        "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'),
-        "Dark": L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png')
-    };
+    const layers = { "Standard": L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'), "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'), "Dark": L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png') };
+    const map = L.map('map', {zoomControl: false, zoomAnimation: true}).setView([20, 100], 3);
+    layers.Standard.addTo(map); L.control.layers(layers).addTo(map);
 
-    const map = L.map('map', {zoomControl: false, zoomAnimation: true, markerZoomAnimation: false}).setView([20, 100], 3);
-    layers.Standard.addTo(map);
-    L.control.layers(layers).addTo(map);
-
-    let currentProd = 'SM';
-    let activeMarkers = [];
-    let currentRawData = [];
-    let currentTheme = 'light';
-
-    // ★ 지도 테마 변경 감지 및 마커 보색 업데이트 로직 ★
-    map.on('baselayerchange', (e) => {
-        currentTheme = (e.name === "Dark") ? 'dark' : 'light';
-        if (currentRawData.length > 0) renderEverything(currentRawData, currentProd);
-    });
+    let currentProd = 'SM', activeMarkers = [], currentRawData = [], currentTheme = 'light';
+    map.on('baselayerchange', (e) => { currentTheme = (e.name === "Dark") ? 'dark' : 'light'; if (currentRawData.length > 0) renderEverything(currentRawData, currentProd); });
 
     function showUpdateModal() { document.getElementById('admin-password').value = ""; document.getElementById('auth-section').style.display = 'block'; document.getElementById('data-input-section').style.display = 'none'; document.getElementById('update-modal').style.display = 'block'; }
     function closeModal() { document.getElementById('update-modal').style.display = 'none'; }
     function verifyAdmin() { if (document.getElementById('admin-password').value === ADMIN_PASS) { document.getElementById('auth-section').style.display = 'none'; document.getElementById('data-input-section').style.display = 'block'; } else { alert("❌ 보안 경고: 암호 불일치."); } }
-    
-    function saveManualData() {
-        const input = document.getElementById('csv-input').value;
-        const parsed = parseUniversal(input);
-        if(parsed.length > 0) { localStorage.setItem(`MANUAL_DATA_${currentProd}`, JSON.stringify(parsed)); alert(`✅ ${currentProd} 저장 완료.`); closeModal(); renderEverything(parsed, currentProd); }
-        else { alert("데이터 형식을 확인하세요."); }
-    }
-
+    function saveManualData() { const input = document.getElementById('csv-input').value; const parsed = parseUniversal(input); if(parsed.length > 0) { localStorage.setItem(`MANUAL_DATA_${currentProd}`, JSON.stringify(parsed)); alert(`✅ ${currentProd} 저장 완료.`); closeModal(); renderEverything(parsed, currentProd); } else { alert("데이터 형식을 확인하세요."); } }
     function clearManualData() { if(confirm("메모리를 초기화하시겠습니까?")) { localStorage.removeItem(`MANUAL_DATA_${currentProd}`); location.reload(); } }
 
     function parseUniversal(text) {
         const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
         if(lines.length < 2) return [];
-        const delimiter = lines[0].includes('\t') ? '\t' : ',';
-        const headers = lines[0].split(delimiter).map(h => h.trim().toLowerCase());
+        const del = lines[0].includes('\t') ? '\t' : ',';
+        const heads = lines[0].split(del).map(h => h.trim().toLowerCase());
         return lines.slice(1).map(line => {
-            const values = line.split(delimiter);
-            let obj = {};
-            headers.forEach((h, i) => {
-                let val = values[i] ? values[i].trim() : "";
-                if (["capacity", "lat", "lng", "days"].includes(h)) val = parseFloat(val.replace(/[^0-9.-]/g, "")) || 0;
-                obj[h] = val;
-            });
+            const vals = line.split(del); let obj = {};
+            heads.forEach((h, i) => { let v = vals[i] ? vals[i].trim() : ""; if (["capacity", "lat", "lng", "days"].includes(h)) v = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0; obj[h] = v; });
             return obj;
         });
     }
 
-    function flyToTarget(lat, lng, zoom, marker = null) { const offset = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360; const targetPoint = map.project([lat, lng], zoom).subtract([offset / 2, 0]); map.flyTo(map.unproject(targetPoint, zoom), zoom, { duration: 1.5 }); if(marker) map.once('moveend', () => marker.openPopup()); }
+    function flyToTarget(lat, lng, zoom, marker = null) { const off = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360; const pt = map.project([lat, lng], zoom).subtract([off / 2, 0]); map.flyTo(map.unproject(pt, zoom), zoom, { duration: 1.5 }); if(marker) map.once('moveend', () => marker.openPopup()); }
     function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
 
     async function switchProduct(prod) {
-        currentProd = prod;
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById('btn-' + prod).classList.add('active');
-        const overlay = document.getElementById('sync-overlay');
-        const mainText = document.getElementById('sync-main-text');
-        const subText = document.getElementById('sync-sub-text');
-        const icon = document.getElementById('sync-icon');
-        overlay.style.display = 'flex'; overlay.style.opacity = '1';
-        icon.className = "sync-spinner"; icon.innerHTML = "";
-        mainText.innerText = "동기화 시도 중...";
-        subText.innerText = "Attempting Online Sync...";
-
+        currentProd = prod; document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.getElementById('btn-' + prod).classList.add('active');
+        const ovl = document.getElementById('sync-overlay'), main = document.getElementById('sync-main-text'), icon = document.getElementById('sync-icon');
+        ovl.style.display = 'flex'; ovl.style.opacity = '1'; icon.className = "sync-spinner"; icon.innerHTML = ""; main.innerText = "동기화 시도 중...";
         try {
-            const response = await fetch(SHEET_URLS[prod] + "&t=" + new Date().getTime());
-            if (!response.ok) throw new Error("Blocked");
-            const data = parseUniversal(await response.text());
-            mainText.innerText = "온라인 연동 완료";
-            subText.innerText = "Online Sync Complete";
-            icon.className = ""; icon.innerHTML = "<div style='font-size:50px;'>✅</div>";
+            const res = await fetch(SHEET_URLS[prod] + "&t=" + new Date().getTime());
+            if (!res.ok) throw new Error();
+            const data = parseUniversal(await res.text());
+            main.innerText = "온라인 연동 완료"; icon.className = ""; icon.innerHTML = "<div style='font-size:50px;'>✅</div>";
             document.getElementById('data-mode').innerText = "LIVE SYNC"; document.getElementById('data-mode').style.background = "#2ECC71";
             currentRawData = data; renderEverything(data, prod);
-            setTimeout(() => { overlay.style.opacity = '0'; setTimeout(() => { overlay.style.display = 'none'; }, 600); }, 1000);
+            setTimeout(() => { ovl.style.opacity = '0'; setTimeout(() => { ovl.style.display = 'none'; }, 600); }, 1200);
         } catch (e) {
+            icon.innerHTML = ""; main.innerText = "보안 확인: 픽스 모드로 전환"; main.style.color = "#FF4D4D";
             setTimeout(() => {
-                let data = []; const localData = localStorage.getItem(`MANUAL_DATA_${prod}`);
-                if (localData) { data = JSON.parse(localData); document.getElementById('data-mode').innerText = "MEMORY MODE"; }
-                else { try { if (prod === 'SM') data = (typeof data_sm !== 'undefined') ? data_sm : []; if (prod === 'AN') data = (typeof data_an !== 'undefined') ? data_an : []; if (prod === 'BD') data = (typeof data_bd !== 'undefined') ? data_bd : []; document.getElementById('data-mode').innerText = "FIXED MODE"; } catch(err) { console.error(err); } }
-                document.getElementById('data-mode').style.background = "#E74C3C";
-                currentRawData = data; renderEverything(data, prod);
-                setTimeout(() => { overlay.style.opacity = '0'; setTimeout(() => { overlay.style.display = 'none'; }, 600); }, 1000);
+                let d = []; const lData = localStorage.getItem(`MANUAL_DATA_${prod}`);
+                if (lData) { d = JSON.parse(lData); document.getElementById('data-mode').innerText = "MEMORY MODE"; }
+                else { try { if (prod === 'SM') d = (typeof data_sm !== 'undefined') ? data_sm : []; if (prod === 'AN') d = (typeof data_an !== 'undefined') ? data_an : []; if (prod === 'BD') d = (typeof data_bd !== 'undefined') ? data_bd : []; document.getElementById('data-mode').innerText = "FIXED MODE"; } catch(err) {} }
+                document.getElementById('data-mode').style.background = "#E74C3C"; 
+                currentRawData = d; renderEverything(d, prod);
+                setTimeout(() => { ovl.style.opacity = '0'; setTimeout(() => { ovl.style.display = 'none'; main.style.color = "white"; }, 600); }, 1000);
             }, 1000);
         }
     }
@@ -215,63 +182,51 @@
         activeMarkers.forEach(m => map.removeLayer(m)); activeMarkers = [];
         document.getElementById('current-risk-list').innerHTML = ''; document.getElementById('future-risk-list').innerHTML = ''; document.getElementById('region-list').innerHTML = '';
         if (!data || data.length === 0) return;
-        const globalTotalCapa = data.reduce((s, p) => s + (parseFloat(p.capacity) || 0), 0);
-        document.getElementById('global-val').innerText = Math.round(globalTotalCapa).toLocaleString(); document.getElementById('total-sites').innerText = data.length;
-        let curLoss = 0, futLoss = 0; const regions = {};
-        
+        const total = data.reduce((s, p) => s + (parseFloat(p.capacity) || 0), 0);
+        document.getElementById('global-val').innerText = Math.round(total).toLocaleString(); document.getElementById('total-sites').innerText = data.length;
+        let cL = 0, fL = 0; const regs = {};
         data.forEach(p => {
             if(!p.lat || !p.lng) return;
-            const status = p.status || "Normal"; const capa = parseFloat(p.capacity) || 0; const days = parseFloat(p.days) || 0;
-            const isCur = status.includes('Current'); const isFut = status.includes('Future'); const loss = ((capa / 365) * days).toFixed(1);
-            if(isCur) curLoss += parseFloat(loss); if(isFut) futLoss += parseFloat(loss);
-            const baseSize = Math.sqrt(capa) * 0.55; let marker;
+            const status = p.status || "Normal", capa = parseFloat(p.capacity) || 0, days = parseFloat(p.days) || 0;
+            const isC = status.includes('Current'), isF = status.includes('Future'), loss = ((capa / 365) * days).toFixed(1);
+            if(isC) cL += parseFloat(loss); if(isF) fL += parseFloat(loss);
+            const size = Math.sqrt(capa) * 0.55; let m;
             
-            if (isCur || isFut) {
-                const color = isCur ? (currentTheme === 'dark' ? '#FF5252' : '#1A1A1B') : (currentTheme === 'dark' ? '#FFAB40' : '#D35400');
-                const glow = currentTheme === 'dark' ? 'filter: drop-shadow(0 0 5px white);' : '';
-                marker = L.marker([p.lat, p.lng], { icon: L.divIcon({ html: `<svg width="${baseSize*2.2}" height="${baseSize*2.2}" viewBox="0 0 24 24" style="${glow}"><path d="M12 2L2 22H22L12 2Z" fill="${color}" stroke="${currentTheme === 'dark' ? 'white' : '#A04000'}" stroke-width="2"/></svg>`, className: 'custom-triangle', iconSize: [baseSize*2.2, baseSize*2.2], iconAnchor: [baseSize*1.1, baseSize*1.1] }) }).addTo(map);
+            if (isC || isF) {
+                const col = isC ? (currentTheme === 'dark' ? '#FF5252' : '#1A1A1B') : (currentTheme === 'dark' ? '#FFAB40' : '#D35400');
+                m = L.marker([p.lat, p.lng], { icon: L.divIcon({ html: `<svg width="${size*2.2}" height="${size*2.2}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="${col}" stroke-width="0"/></svg>`, className: 'custom-triangle', iconSize: [size*2.2, size*2.2], iconAnchor: [size*1.1, size*1.1] }) }).addTo(map);
             } else {
-                const fillColor = regionColors[currentTheme][p.region] || regionColors[currentTheme].Other;
-                marker = L.circleMarker([p.lat, p.lng], { radius: baseSize, fillColor: fillColor, color: currentTheme === 'dark' ? '#fff' : '#333', weight: 1.5, fillOpacity: 0.9, stroke: true }).addTo(map);
+                const fill = regionColors[currentTheme][p.region] || regionColors[currentTheme].Other;
+                m = L.circleMarker([p.lat, p.lng], { radius: size, fillColor: fill, fillOpacity: 0.9, stroke: false }).addTo(map);
             }
-            
-            marker.bindPopup(`<b>${p.company}</b><br><hr>Capa: ${capa}K MT<br>Status: ${status}<br>Period: ${p.period || '-'}<br>Days: ${days} days`);
-            marker.on('click', (e) => { L.DomEvent.stopPropagation(e); flyToTarget(p.lat, p.lng, 7, marker); });
-            activeMarkers.push(marker); p._m = marker;
-
-            const reg = p.region || "Unknown"; const cou = p.country || "Other";
-            if (!regions[reg]) regions[reg] = { name: reg, countries: {}, totalPlants: 0, totalCapa: 0, sumLat: 0, sumLng: 0 };
-            if (!regions[reg].countries[cou]) regions[reg].countries[cou] = { name: cou, plants: [], countryCapa: 0, sumLat: 0, sumLng: 0 };
-            
-            const createCard = (showShare = true) => {
-                const card = document.createElement('div'); card.className = 'plant-card';
-                card.innerHTML = `${(isCur||isFut)?`<span class="loss-badge">${loss}K</span>`:''}<b>${p.company}</b> ${showShare?`<span style="color:#1597BB">(${((capa/globalTotalCapa)*100).toFixed(1)}%)</span>`:''}<div style="color:#666; font-size:0.65rem;">${capa}K | ${status}</div>`;
-                card.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); };
-                return card;
+            m.bindPopup(`<b>${p.company}</b><br><hr>Capa: ${capa}K MT<br>Status: ${status}<br>Period: ${p.period || '-'}<br>Days: ${days} days`);
+            m.on('click', (e) => { L.DomEvent.stopPropagation(e); flyToTarget(p.lat, p.lng, 7, m); });
+            activeMarkers.push(m); p._m = m;
+            const createCard = (show) => {
+                const d = document.createElement('div'); d.className = 'plant-card';
+                d.innerHTML = `${(isC||isF)?`<span class="loss-badge">${loss}K</span>`:''}<b>${p.company}</b> ${show?`<span style="color:#1597BB">(${((capa/total)*100).toFixed(1)}%)</span>`:''}<div style="color:#666; font-size:0.65rem;">${capa}K | ${status}</div>`;
+                d.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); }; return d;
             };
-            const cardForList = createCard(true);
-            if(isCur) document.getElementById('current-risk-list').appendChild(createCard(false)); else if(isFut) document.getElementById('future-risk-list').appendChild(createCard(false));
-            regions[reg].countries[cou].plants.push(cardForList);
-            regions[reg].countries[cou].countryCapa += capa;
-            regions[reg].countries[cou].sumLat += p.lat; regions[reg].countries[cou].sumLng += p.lng;
-            regions[reg].totalPlants++; regions[reg].totalCapa += capa;
-            regions[reg].sumLat += p.lat; regions[reg].sumLng += p.lng;
+            if(isC) document.getElementById('current-risk-list').appendChild(createCard(false)); else if(isF) document.getElementById('future-risk-list').appendChild(createCard(false));
+            const r = p.region || "Unknown", c = p.country || "Other";
+            if (!regs[r]) regs[r] = { name: r, countries: {}, totalP: 0, totalC: 0, sLat: 0, sLng: 0 };
+            if (!regs[r].countries[c]) regs[r].countries[c] = { name: c, plants: [], cCapa: 0, sLat: 0, sLng: 0 };
+            regs[r].countries[c].plants.push(createCard(true)); regs[r].countries[c].cCapa += capa;
+            regs[r].countries[c].sLat += p.lat; regs[r].countries[c].sLng += p.lng;
+            regs[r].totalP++; regs[r].totalC += capa; regs[r].sLat += p.lat; regs[r].sLng += p.lng;
         });
-
-        document.getElementById('cur-ratio').innerText = globalTotalCapa > 0 ? ((curLoss/globalTotalCapa)*100).toFixed(2) + "%" : "0.00%";
-        document.getElementById('fut-ratio').innerText = globalTotalCapa > 0 ? ((futLoss/globalTotalCapa)*100).toFixed(2) + "%" : "0.00%";
-        document.getElementById('cur-sum-h').innerText = curLoss.toFixed(1) + "K ▼"; document.getElementById('fut-sum-h').innerText = futLoss.toFixed(1) + "K ▼";
-
-        Object.values(regions).sort((a,b) => b.totalPlants - a.totalPlants).forEach(r => {
+        document.getElementById('cur-ratio').innerText = total > 0 ? ((cL/total)*100).toFixed(2) + "%" : "0.00%";
+        document.getElementById('fut-ratio').innerText = total > 0 ? ((fL/total)*100).toFixed(2) + "%" : "0.00%";
+        document.getElementById('cur-sum-h').innerText = cL.toFixed(1) + "K ▼"; document.getElementById('fut-sum-h').innerText = fL.toFixed(1) + "K ▼";
+        Object.values(regs).sort((a,b) => b.totalP - a.totalP).forEach(r => {
             const rDiv = document.createElement('div');
-            rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${r.sumLat/r.totalPlants}, ${r.sumLng/r.totalPlants}, 4);"><span>${r.name} (${r.totalPlants}) <span class="header-stats" style="color:#C0392B;">${Math.round(r.totalCapa).toLocaleString()}K (${((r.totalCapa/globalTotalCapa)*100).toFixed(1)}%)</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
+            rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${r.sLat/r.totalP}, ${r.sLng/r.totalP}, 4);"><span>${r.name} (${r.totalP}) <span class="header-stats" style="color:#C0392B;">${Math.round(r.totalC).toLocaleString()}K (${((r.totalC/total)*100).toFixed(1)}%)</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
             const rCont = rDiv.querySelector('.collapsible-content');
-            Object.values(r.countries).sort((a,b) => b.countryCapa - a.countryCapa).forEach(c => {
+            Object.values(r.countries).sort((a,b) => b.cCapa - a.cCapa).forEach(c => {
                 const cDiv = document.createElement('div');
-                cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${c.sumLat/c.plants.length}, ${c.sumLng/c.plants.length}, 5.5);"><span>${c.name} (${c.plants.length}) <span class="header-stats" style="color:#1597BB; font-size:0.8rem;">${Math.round(c.countryCapa).toLocaleString()}K (${((c.countryCapa/globalTotalCapa)*100).toFixed(1)}%)</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
+                cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${c.sLat/c.plants.length}, ${c.sLng/c.plants.length}, 5.5);"><span>${c.name} (${c.plants.length}) <span class="header-stats" style="color:#1597BB; font-size:0.8rem;">${Math.round(c.cCapa).toLocaleString()}K (${((c.countryCapa/total)*100).toFixed(1)}%)</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
                 const cCont = cDiv.querySelector('.collapsible-content');
-                c.plants.forEach(pCard => cCont.appendChild(pCard));
-                rCont.appendChild(cDiv);
+                c.plants.forEach(pCard => cCont.appendChild(pCard)); rCont.appendChild(cDiv);
             });
             document.getElementById('region-list').appendChild(rDiv);
         });
