@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v9.9)</title>
+    <title>Global Supply Control Tower | JS KIM (v10.0)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="data/data_sm.js"></script>
     <script src="data/data_an.js"></script>
@@ -11,10 +11,9 @@
         :root { --primary: #0A2647; --accent: #1597BB; --current: #1A1A1B; --future: #D35400; --bg: #F0F5F9; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Pretendard', sans-serif; overflow: hidden; }
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
-        #map { flex-grow: 1; height: 100%; background: #DAEAF1; z-index: 1; }
+        #map { flex-grow: 1; height: 100%; background: #0b192e; z-index: 1; }
         .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-popup { -webkit-backface-visibility: hidden; backface-visibility: hidden; will-change: transform; transition: none !important; }
         
-        /* 사이드바 레이아웃 */
         #sidebar { position: absolute; left: 0; top: 0; width: 360px; height: 100%; background: white; z-index: 2000; transition: transform 0.4s ease; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
         #sidebar.hidden { transform: translateX(-100%); }
         #toggle-btn { position: absolute; right: -45px; top: 20px; width: 45px; height: 45px; background: var(--primary); color: white; border: none; cursor: pointer; border-radius: 0 8px 8px 0; font-size: 18px; z-index: 2001; }
@@ -43,13 +42,11 @@
         .plant-card { padding: 12px 15px 12px 30px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.72rem; background: white; position: relative; }
         .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 2px 6px; border-radius: 10px; font-size: 0.6rem; position: absolute; right: 10px; top: 10px; }
         
-        /* 보안 업데이트 모달 */
         #update-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 420px; background: white; z-index: 11000; padding: 25px; box-shadow: 0 0 60px rgba(0,0,0,0.6); border-radius: 20px; display: none; }
         #update-modal textarea { width: 100%; height: 180px; margin: 10px 0; font-size: 0.75rem; border: 1px solid #ddd; border-radius: 5px; padding: 8px; box-sizing: border-box; }
         #admin-password { width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid var(--primary); border-radius: 8px; box-sizing: border-box; font-weight: bold; font-size: 1rem; text-align: center; }
         #data-input-section { display: none; border-top: 2px dashed #eee; padding-top: 15px; margin-top: 10px; }
         
-        /* 동기화 브리핑 오버레이 */
         #sync-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 38, 71, 0.97); z-index: 10000; display: none; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; transition: opacity 0.4s ease; }
         .sync-spinner { width: 45px; height: 45px; border: 4px solid rgba(255,255,255,0.2); border-top: 4px solid #FFD700; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -69,7 +66,7 @@
         <button style="background:var(--primary); color:white; padding:12px; width:100%; border:none; border-radius:8px; cursor:pointer; font-weight:900;" onclick="verifyAdmin()">보안 인증 확인</button>
     </div>
     <div id="data-input-section">
-        <textarea id="csv-input" placeholder="엑셀 또는 시트에서 복사한 데이터를 붙여넣으세요..."></textarea>
+        <textarea id="csv-input" placeholder="데이터를 붙여넣으세요..."></textarea>
         <div style="display: flex; gap: 10px;">
             <button style="flex: 2; background:#27ae60; color:white; padding:15px; border:none; border-radius:10px; cursor:pointer; font-weight:900;" onclick="saveManualData()">저장</button>
             <button style="flex: 1; background:#e67e22; color:white; padding:15px; border:none; border-radius:10px; cursor:pointer; font-weight:900;" onclick="clearManualData()">초기화</button>
@@ -119,7 +116,12 @@
     const ADMIN_PASS = "jskim0111"; //
     const SHEET_URLS = { 'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv', 'AN': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=263516767&single=true&output=csv', 'BD': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=607848019&single=true&output=csv' };
     
-    // ★ 지도 레이어 정의 (Standard, Satellite, Dark) ★
+    // ★ 다크모드 대응 보색 컬러 엔진 ★
+    const regionColors = {
+        light: { "NEA": "#5DADE2", "SEA": "#48C9B0", "NA": "#52BE80", "WE": "#AF7AC5", "CE": "#9B59B6", "CIS": "#EB984E", "ME": "#EC7063", "Other": "#BDC3C7" },
+        dark: { "NEA": "#00E5FF", "SEA": "#00FFC8", "NA": "#ADFF2F", "WE": "#F06292", "CE": "#E1BEE7", "CIS": "#FFB74D", "ME": "#FF8A65", "Other": "#FFFFFF" }
+    };
+
     const layers = {
         "Standard": L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'),
         "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'),
@@ -127,13 +129,19 @@
     };
 
     const map = L.map('map', {zoomControl: false, zoomAnimation: true, markerZoomAnimation: false}).setView([20, 100], 3);
-    layers.Standard.addTo(map); // 기본 지도 설정
-
-    // ★ 우측 상단 지도 전환 컨트롤 추가 ★
+    layers.Standard.addTo(map);
     L.control.layers(layers).addTo(map);
 
     let currentProd = 'SM';
     let activeMarkers = [];
+    let currentRawData = [];
+    let currentTheme = 'light';
+
+    // ★ 지도 테마 변경 감지 및 마커 보색 업데이트 로직 ★
+    map.on('baselayerchange', (e) => {
+        currentTheme = (e.name === "Dark") ? 'dark' : 'light';
+        if (currentRawData.length > 0) renderEverything(currentRawData, currentProd);
+    });
 
     function showUpdateModal() { document.getElementById('admin-password').value = ""; document.getElementById('auth-section').style.display = 'block'; document.getElementById('data-input-section').style.display = 'none'; document.getElementById('update-modal').style.display = 'block'; }
     function closeModal() { document.getElementById('update-modal').style.display = 'none'; }
@@ -151,7 +159,7 @@
     function parseUniversal(text) {
         const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
         if(lines.length < 2) return [];
-        const delimiter = lines[0].includes('\t') ? '\t' : ','; //
+        const delimiter = lines[0].includes('\t') ? '\t' : ',';
         const headers = lines[0].split(delimiter).map(h => h.trim().toLowerCase());
         return lines.slice(1).map(line => {
             const values = line.split(delimiter);
@@ -172,12 +180,10 @@
         currentProd = prod;
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.getElementById('btn-' + prod).classList.add('active');
-        
         const overlay = document.getElementById('sync-overlay');
         const mainText = document.getElementById('sync-main-text');
         const subText = document.getElementById('sync-sub-text');
         const icon = document.getElementById('sync-icon');
-        
         overlay.style.display = 'flex'; overlay.style.opacity = '1';
         icon.className = "sync-spinner"; icon.innerHTML = "";
         mainText.innerText = "동기화 시도 중...";
@@ -187,28 +193,20 @@
             const response = await fetch(SHEET_URLS[prod] + "&t=" + new Date().getTime());
             if (!response.ok) throw new Error("Blocked");
             const data = parseUniversal(await response.text());
-            
-            // ★ 온라인 연동 완료 브리핑 ★
             mainText.innerText = "온라인 연동 완료";
             subText.innerText = "Online Sync Complete";
             icon.className = ""; icon.innerHTML = "<div style='font-size:50px;'>✅</div>";
-            
             document.getElementById('data-mode').innerText = "LIVE SYNC"; document.getElementById('data-mode').style.background = "#2ECC71";
-            renderEverything(data, prod);
+            currentRawData = data; renderEverything(data, prod);
             setTimeout(() => { overlay.style.opacity = '0'; setTimeout(() => { overlay.style.display = 'none'; }, 600); }, 1000);
         } catch (e) {
-            // 실패 시 보안 전환 보고
-            icon.innerHTML = "";
-            mainText.innerText = "보안 확인: 픽스 모드로 전환";
-            mainText.style.color = "#FF4D4D";
-            subText.innerText = "Security Verified: Switching to Fixed Mode";
-            
             setTimeout(() => {
                 let data = []; const localData = localStorage.getItem(`MANUAL_DATA_${prod}`);
                 if (localData) { data = JSON.parse(localData); document.getElementById('data-mode').innerText = "MEMORY MODE"; }
                 else { try { if (prod === 'SM') data = (typeof data_sm !== 'undefined') ? data_sm : []; if (prod === 'AN') data = (typeof data_an !== 'undefined') ? data_an : []; if (prod === 'BD') data = (typeof data_bd !== 'undefined') ? data_bd : []; document.getElementById('data-mode').innerText = "FIXED MODE"; } catch(err) { console.error(err); } }
-                document.getElementById('data-mode').style.background = "#E74C3C"; renderEverything(data, prod);
-                setTimeout(() => { overlay.style.opacity = '0'; setTimeout(() => { overlay.style.display = 'none'; mainText.style.color = "white"; }, 600); }, 1000);
+                document.getElementById('data-mode').style.background = "#E74C3C";
+                currentRawData = data; renderEverything(data, prod);
+                setTimeout(() => { overlay.style.opacity = '0'; setTimeout(() => { overlay.style.display = 'none'; }, 600); }, 1000);
             }, 1000);
         }
     }
@@ -224,14 +222,20 @@
         data.forEach(p => {
             if(!p.lat || !p.lng) return;
             const status = p.status || "Normal"; const capa = parseFloat(p.capacity) || 0; const days = parseFloat(p.days) || 0;
-            const period = p.period || "-";
             const isCur = status.includes('Current'); const isFut = status.includes('Future'); const loss = ((capa / 365) * days).toFixed(1);
             if(isCur) curLoss += parseFloat(loss); if(isFut) futLoss += parseFloat(loss);
             const baseSize = Math.sqrt(capa) * 0.55; let marker;
-            if (isCur || isFut) { const color = isCur ? '#1A1A1B' : '#D35400'; marker = L.marker([p.lat, p.lng], { icon: L.divIcon({ html: `<svg width="${baseSize*2.2}" height="${baseSize*2.2}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="${color}" stroke="${isCur?'none':'#A04000'}" stroke-width="${isCur?0:2}"/></svg>`, className: 'custom-triangle', iconSize: [baseSize*2.2, baseSize*2.2], iconAnchor: [baseSize*1.1, baseSize*1.1] }) }).addTo(map); }
-            else { const regionMap = { "NEA": "#5DADE2", "SEA": "#48C9B0", "NA": "#52BE80", "WE": "#AF7AC5" }; marker = L.circleMarker([p.lat, p.lng], { radius: baseSize, fillColor: regionMap[p.region] || "#BDC3C7", color: "#333", weight: 1.5, fillOpacity: 0.85, stroke: true }).addTo(map); }
             
-            marker.bindPopup(`<b>${p.company}</b><br><hr>Capa: ${capa}K MT<br>Status: ${status}<br>Period: ${period}<br>Days: ${days} days`);
+            if (isCur || isFut) {
+                const color = isCur ? (currentTheme === 'dark' ? '#FF5252' : '#1A1A1B') : (currentTheme === 'dark' ? '#FFAB40' : '#D35400');
+                const glow = currentTheme === 'dark' ? 'filter: drop-shadow(0 0 5px white);' : '';
+                marker = L.marker([p.lat, p.lng], { icon: L.divIcon({ html: `<svg width="${baseSize*2.2}" height="${baseSize*2.2}" viewBox="0 0 24 24" style="${glow}"><path d="M12 2L2 22H22L12 2Z" fill="${color}" stroke="${currentTheme === 'dark' ? 'white' : '#A04000'}" stroke-width="2"/></svg>`, className: 'custom-triangle', iconSize: [baseSize*2.2, baseSize*2.2], iconAnchor: [baseSize*1.1, baseSize*1.1] }) }).addTo(map);
+            } else {
+                const fillColor = regionColors[currentTheme][p.region] || regionColors[currentTheme].Other;
+                marker = L.circleMarker([p.lat, p.lng], { radius: baseSize, fillColor: fillColor, color: currentTheme === 'dark' ? '#fff' : '#333', weight: 1.5, fillOpacity: 0.9, stroke: true }).addTo(map);
+            }
+            
+            marker.bindPopup(`<b>${p.company}</b><br><hr>Capa: ${capa}K MT<br>Status: ${status}<br>Period: ${p.period || '-'}<br>Days: ${days} days`);
             marker.on('click', (e) => { L.DomEvent.stopPropagation(e); flyToTarget(p.lat, p.lng, 7, marker); });
             activeMarkers.push(marker); p._m = marker;
 
@@ -239,14 +243,15 @@
             if (!regions[reg]) regions[reg] = { name: reg, countries: {}, totalPlants: 0, totalCapa: 0, sumLat: 0, sumLng: 0 };
             if (!regions[reg].countries[cou]) regions[reg].countries[cou] = { name: cou, plants: [], countryCapa: 0, sumLat: 0, sumLng: 0 };
             
-            const card = document.createElement('div'); card.className = 'plant-card';
-            card.innerHTML = `${(isCur||isFut)?`<span class="loss-badge">${loss}K</span>`:''}<b>${p.company}</b> <span style="color:#1597BB">(${((capa/globalTotalCapa)*100).toFixed(1)}%)</span><div style="color:#666; font-size:0.65rem;">${capa}K | ${status}</div>`;
-            card.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); };
-            
-            if(isCur) document.getElementById('current-risk-list').appendChild(card.cloneNode(true));
-            else if(isFut) document.getElementById('future-risk-list').appendChild(card.cloneNode(true));
-            
-            regions[reg].countries[cou].plants.push(card);
+            const createCard = (showShare = true) => {
+                const card = document.createElement('div'); card.className = 'plant-card';
+                card.innerHTML = `${(isCur||isFut)?`<span class="loss-badge">${loss}K</span>`:''}<b>${p.company}</b> ${showShare?`<span style="color:#1597BB">(${((capa/globalTotalCapa)*100).toFixed(1)}%)</span>`:''}<div style="color:#666; font-size:0.65rem;">${capa}K | ${status}</div>`;
+                card.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); };
+                return card;
+            };
+            const cardForList = createCard(true);
+            if(isCur) document.getElementById('current-risk-list').appendChild(createCard(false)); else if(isFut) document.getElementById('future-risk-list').appendChild(createCard(false));
+            regions[reg].countries[cou].plants.push(cardForList);
             regions[reg].countries[cou].countryCapa += capa;
             regions[reg].countries[cou].sumLat += p.lat; regions[reg].countries[cou].sumLng += p.lng;
             regions[reg].totalPlants++; regions[reg].totalCapa += capa;
@@ -259,13 +264,11 @@
 
         Object.values(regions).sort((a,b) => b.totalPlants - a.totalPlants).forEach(r => {
             const rDiv = document.createElement('div');
-            rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${r.sumLat/r.totalPlants}, ${r.sumLng/r.totalPlants}, 4);">
-                                <span>${r.name} (${r.totalPlants}) <span class="header-stats" style="color:#C0392B;">${Math.round(r.totalCapa).toLocaleString()}K (${((r.totalCapa/globalTotalCapa)*100).toFixed(1)}%)</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
+            rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${r.sumLat/r.totalPlants}, ${r.sumLng/r.totalPlants}, 4);"><span>${r.name} (${r.totalPlants}) <span class="header-stats" style="color:#C0392B;">${Math.round(r.totalCapa).toLocaleString()}K (${((r.totalCapa/globalTotalCapa)*100).toFixed(1)}%)</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
             const rCont = rDiv.querySelector('.collapsible-content');
             Object.values(r.countries).sort((a,b) => b.countryCapa - a.countryCapa).forEach(c => {
                 const cDiv = document.createElement('div');
-                cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${c.sumLat/c.plants.length}, ${c.sumLng/c.plants.length}, 5.5);">
-                                    <span>${c.name} (${c.plants.length}) <span class="header-stats" style="color:#1597BB; font-size:0.8rem;">${Math.round(c.countryCapa).toLocaleString()}K (${((c.countryCapa/globalTotalCapa)*100).toFixed(1)}%)</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
+                cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${c.sumLat/c.plants.length}, ${c.sumLng/c.plants.length}, 5.5);"><span>${c.name} (${c.plants.length}) <span class="header-stats" style="color:#1597BB; font-size:0.8rem;">${Math.round(c.countryCapa).toLocaleString()}K (${((c.countryCapa/globalTotalCapa)*100).toFixed(1)}%)</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
                 const cCont = cDiv.querySelector('.collapsible-content');
                 c.plants.forEach(pCard => cCont.appendChild(pCard));
                 rCont.appendChild(cDiv);
