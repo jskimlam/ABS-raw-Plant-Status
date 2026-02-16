@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v10.7)</title>
+    <title>Global Supply Control Tower | JS KIM (v10.8)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="data/data_sm.js"></script>
     <script src="data/data_an.js"></script>
@@ -190,18 +190,24 @@
         }).join('');
     }
 
+    // ★ 수정된 핵심 함수: Deleted 업체 필터링 및 합산 제외 ★
     function renderEverything(data, prodName) {
         activeMarkers.forEach(m => map.removeLayer(m)); activeMarkers = [];
         document.getElementById('current-risk-list').innerHTML = ''; document.getElementById('future-risk-list').innerHTML = ''; document.getElementById('region-list').innerHTML = '';
         if (!data || data.length === 0) return;
-        const total = data.reduce((s, p) => s + (parseFloat(p.capacity) || 0), 0);
-        document.getElementById('global-val').innerText = Math.round(total).toLocaleString(); document.getElementById('total-sites').innerText = data.length;
+
+        // [1] Deleted 업체는 원본 데이터에서 아예 제외 (대소문자 무관)
+        const activeData = data.filter(p => !(p.status && p.status.toLowerCase().includes('deleted')));
+
+        // [2] 모든 합산은 activeData(활성 업체) 기준으로만 계산
+        const total = activeData.reduce((s, p) => s + (parseFloat(p.capacity) || 0), 0);
+        document.getElementById('global-val').innerText = Math.round(total).toLocaleString(); 
+        document.getElementById('total-sites').innerText = activeData.length;
+
         let cL = 0, fL = 0; const regs = {};
         
-        data.forEach(p => {
-            // ★ 신규: Deleted 상태면 지도와 리스트에서 아예 제외 ★
-            if (p.status && p.status.toLowerCase().includes('deleted')) return; 
-
+        // [3] 지도 핀 생성 및 리스트 구성
+        activeData.forEach(p => {
             if(!p.lat || !p.lng) return;
             const status = p.status || "Normal", capa = parseFloat(p.capacity) || 0, days = parseFloat(p.days) || 0;
             const isC = status.includes('Current'), isF = status.includes('Future'), loss = ((capa / 365) * days).toFixed(1);
