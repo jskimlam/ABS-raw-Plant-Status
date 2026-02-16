@@ -2,9 +2,10 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v11.0)</title>
+    <title>Global Supply Control Tower | JS KIM (v11.2)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     <script src="data/data_sm.js"></script>
     <script src="data/data_an.js"></script>
     <script src="data/data_bd.js"></script>
@@ -34,6 +35,7 @@
         .collapsible-content { display: none; }
         .open > .collapsible-content { display: block; }
         .plant-card { padding: 12px 15px 12px 30px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.72rem; background: white; position: relative; }
+        .plant-card:hover { background: #f9f9f9; }
         .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 2px 6px; border-radius: 10px; font-size: 0.6rem; position: absolute; right: 10px; top: 10px; }
         #update-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 420px; background: white; z-index: 11000; padding: 25px; box-shadow: 0 0 60px rgba(0,0,0,0.6); border-radius: 20px; display: none; }
         #update-modal textarea { width: 100%; height: 180px; margin: 10px 0; font-size: 0.75rem; border: 1px solid #ddd; border-radius: 5px; padding: 8px; box-sizing: border-box; }
@@ -124,7 +126,6 @@
 <script>
     const ADMIN_PASS = "jskim0111";
     const SHEET_URLS = { 'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv', 'AN': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=263516767&single=true&output=csv', 'BD': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=607848019&single=true&output=csv' };
-    const regionColors = { light: { "NEA": { f: "#5DADE2", b: "#1B4F72" }, "SEA": { f: "#48C9B0", b: "#0E6251" }, "NA": { f: "#F39C12", b: "#7E5109" }, "WE": { f: "#8E44AD", b: "#4A235A" }, "CE": { f: "#E91E63", b: "#880E4F" }, "CIS": { f: "#16A085", b: "#0B5345" }, "ME": { f: "#D35400", b: "#6E2C00" }, "Other": { f: "#BDC3C7", b: "#566573" } }, dark: { "NEA": { f: "#00E5FF", b: "#FFFFFF" }, "SEA": { f: "#00FFC8", b: "#FFFFFF" }, "NA": { f: "#FFD600", b: "#FFFFFF" }, "WE": { f: "#E040FB", b: "#FFFFFF" }, "CE": { f: "#FF4081", b: "#FFFFFF" }, "CIS": { f: "#1DE9B6", b: "#FFFFFF" }, "ME": { f: "#FF6E40", b: "#FFFFFF" }, "Other": { f: "#FFFFFF", b: "#000000" } } };
     const layers = { "Standard": L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'), "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'), "Dark": L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png') };
     const map = L.map('map', {zoomControl: false, zoomAnimation: true}).setView([20, 100], 3);
     layers.Standard.addTo(map); L.control.layers(layers).addTo(map);
@@ -139,6 +140,19 @@
     function parseUniversal(text) { const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0); if(lines.length < 2) return []; const del = lines[0].includes('\t') ? '\t' : ','; const heads = lines[0].split(del).map(h => h.trim().toLowerCase()); return lines.slice(1).map(line => { const vals = line.split(del); let obj = {}; heads.forEach((h, i) => { let v = vals[i] ? vals[i].trim() : ""; if (["capacity", "lat", "lng", "days"].includes(h)) v = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0; obj[h] = v; }); return obj; }); }
     function flyToTarget(lat, lng, zoom, marker = null) { const off = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360; const pt = map.project([lat, lng], zoom).subtract([off / 2, 0]); map.flyTo(map.unproject(pt, zoom), zoom, { duration: 1.5 }); if(marker) map.once('moveend', () => marker.openPopup()); }
     function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
+    function buildHistoryItems(historyStr) { if (!historyStr) return '<div style="color:#ccc; font-size:0.65rem; text-align:center; padding:10px;">기록이 없습니다.</div>'; return historyStr.split('|').map(h => { const [status, time] = h.split(':'); const isShutdown = status && status.toLowerCase().includes('shutdown'); return `<div class="history-item ${isShutdown ? 'shutdown' : ''}"><strong>${status}</strong><span>${time}</span></div>`; }).join(''); }
+    function closeChartPanel() { document.getElementById('chart-panel').classList.remove('active'); }
+
+    // 클릭 가능한 카드 생성 함수 (이동 기능 완벽 보강)
+    function createPlantCard(p, totalCapa) {
+        const status = p.status || "Normal", capa = parseFloat(p.capacity) || 0, days = parseFloat(p.days) || 0;
+        const isC = status.includes('Current'), isF = status.includes('Future'), loss = ((capa / 365) * days).toFixed(1);
+        const card = document.createElement('div');
+        card.className = 'plant-card';
+        card.innerHTML = `${(isC||isF)?`<span class="loss-badge">${loss}K</span>`:''}<b>${p.company}</b> <span style="color:#1597BB">(${((capa/totalCapa)*100).toFixed(1)}%)</span><div style="color:#666; font-size:0.65rem;">${capa}K | ${status}</div>`;
+        card.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); };
+        return card;
+    }
 
     async function switchProduct(prod) {
         currentProd = prod; document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.getElementById('btn-' + prod).classList.add('active');
@@ -148,16 +162,37 @@
         catch (e) { icon.innerHTML = ""; main.innerText = "보안 확인: 픽스 모드 전환"; main.style.color = "#FF4D4D"; setTimeout(() => { let d = []; const lD = localStorage.getItem(`MANUAL_DATA_${prod}`); if (lD) { d = JSON.parse(lD); document.getElementById('data-mode').innerText = "MEMORY MODE"; } else { try { if (prod === 'SM') d = data_sm; if (prod === 'AN') d = data_an; if (prod === 'BD') d = data_bd; document.getElementById('data-mode').innerText = "FIXED MODE"; } catch(err) {} } document.getElementById('data-mode').style.background = "#E74C3C"; currentRawData = d; renderEverything(d, prod); setTimeout(() => { ovl.style.opacity = '0'; setTimeout(() => { ovl.style.display = 'none'; main.style.color = "white"; }, 600); }, 1000); }, 1000); }
     }
 
-    function buildHistoryItems(historyStr) { if (!historyStr) return '<div style="color:#ccc; font-size:0.65rem; text-align:center; padding:10px;">기록이 없습니다.</div>'; return historyStr.split('|').map(h => { const [status, time] = h.split(':'); const isShutdown = status && status.toLowerCase().includes('shutdown'); return `<div class="history-item ${isShutdown ? 'shutdown' : ''}"><strong>${status}</strong><span>${time}</span></div>`; }).join(''); }
-    function closeChartPanel() { document.getElementById('chart-panel').classList.remove('active'); }
-
+    // ★ 수정된 차트 표시 함수: 퍼센트(%) 표시 레이블 추가 ★
     function showCountryStats(countryName) {
         const countryData = currentRawData.filter(p => p.country === countryName && !(p.status && p.status.toLowerCase().includes('deleted'))).sort((a,b) => (b.capacity || 0) - (a.capacity || 0));
         if (countryData.length === 0) return alert("표시할 데이터가 없습니다.");
         const labels = countryData.map(p => p.company), dataPoints = countryData.map(p => parseFloat(p.capacity) || 0);
+        const totalVal = dataPoints.reduce((a, b) => a + b, 0);
+
         if (countryChart) countryChart.destroy();
         const ctx = document.getElementById('country-chart').getContext('2d');
-        countryChart = new Chart(ctx, { type: 'pie', data: { labels: labels, datasets: [{ data: dataPoints, backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#7BC225', '#A64B00', '#006E6D'].slice(0, labels.length), borderWidth: 1 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { family: 'Pretendard', size: 11 } } }, title: { display: true, text: `Total: ${Math.round(dataPoints.reduce((a,b)=>a+b,0)).toLocaleString()}K MT`, font: { family: 'Pretendard', size: 14, weight: 'bold' } } } } });
+        
+        countryChart = new Chart(ctx, { 
+            type: 'pie', 
+            data: { labels: labels, datasets: [{ data: dataPoints, backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#7BC225', '#A64B00', '#006E6D'].slice(0, labels.length), borderWidth: 1 }] },
+            plugins: [ChartDataLabels], // 데이터 레이블 플러그인 등록
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                plugins: { 
+                    legend: { position: 'right', labels: { font: { family: 'Pretendard', size: 11 } } }, 
+                    title: { display: true, text: `Total: ${Math.round(totalVal).toLocaleString()}K MT`, font: { family: 'Pretendard', size: 14, weight: 'bold' } },
+                    datalabels: { // ★ 퍼센트 수치 표시 설정 ★
+                        formatter: (value, ctx) => { return (value * 100 / totalVal).toFixed(1) + "%"; },
+                        color: '#fff',
+                        font: { weight: 'bold', size: 12 },
+                        textShadowBlur: 3,
+                        textShadowColor: 'rgba(0,0,0,0.5)',
+                        display: (ctx) => { return (ctx.dataset.data[ctx.dataIndex] * 100 / totalVal) > 3; } // 3% 미만은 겹침 방지를 위해 숨김
+                    }
+                } 
+            } 
+        });
         document.getElementById('chart-country-name').innerText = `${countryName} Capacity Share`; document.getElementById('chart-panel').classList.add('active');
     }
 
@@ -165,16 +200,12 @@
         activeMarkers.forEach(m => map.removeLayer(m)); activeMarkers = [];
         document.getElementById('current-risk-list').innerHTML = ''; document.getElementById('future-risk-list').innerHTML = ''; document.getElementById('region-list').innerHTML = '';
         if (!data || data.length === 0) return;
-
-        // ★ [1] Deleted 필터링 + 업체명(Company) 알파벳 순서(A-Z) 정렬 ★
-        const activeData = data.filter(p => !(p.status && p.status.toLowerCase().includes('deleted')))
-                               .sort((a, b) => (a.company || "").toLowerCase().localeCompare((b.company || "").toLowerCase()));
-
+        const activeData = data.filter(p => !(p.status && p.status.toLowerCase().includes('deleted'))).sort((a, b) => (a.company || "").toLowerCase().localeCompare((b.company || "").toLowerCase()));
         const total = activeData.reduce((s, p) => s + (parseFloat(p.capacity) || 0), 0);
-        document.getElementById('global-val').innerText = Math.round(total).toLocaleString(); 
-        document.getElementById('total-sites').innerText = activeData.length;
+        document.getElementById('global-val').innerText = Math.round(total).toLocaleString(); document.getElementById('total-sites').innerText = activeData.length;
         let cL = 0, fL = 0; const regs = {};
-        
+        const regionColors = { light: { "NEA": { f: "#5DADE2", b: "#1B4F72" }, "SEA": { f: "#48C9B0", b: "#0E6251" }, "NA": { f: "#F39C12", b: "#7E5109" }, "WE": { f: "#8E44AD", b: "#4A235A" }, "CE": { f: "#E91E63", b: "#880E4F" }, "CIS": { f: "#1DE9B6", b: "#FFFFFF" }, "ME": { f: "#D35400", b: "#6E2C00" }, "Other": { f: "#BDC3C7", b: "#566573" } }, dark: { "NEA": { f: "#00E5FF", b: "#FFFFFF" }, "SEA": { f: "#00FFC8", b: "#FFFFFF" }, "NA": { f: "#FFD600", b: "#FFFFFF" }, "WE": { f: "#E040FB", b: "#FFFFFF" }, "CE": { f: "#FF4081", b: "#FFFFFF" }, "CIS": { f: "#1DE9B6", b: "#FFFFFF" }, "ME": { f: "#FF6E40", b: "#FFFFFF" }, "Other": { f: "#FFFFFF", b: "#000000" } } };
+
         activeData.forEach(p => {
             if(!p.lat || !p.lng) return;
             const status = p.status || "Normal", capa = parseFloat(p.capacity) || 0, days = parseFloat(p.days) || 0;
@@ -192,13 +223,15 @@
             m.bindPopup(`<div style="min-width:210px; font-family:'Pretendard'; padding:5px;"><div style="font-size:1.1rem; font-weight:900; color:var(--primary); margin-bottom:10px; border-bottom:2px solid var(--accent); padding-bottom:5px;">${p.company}</div><div class="info-row"><span class="info-label">Region / Country</span><span class="info-value">${p.region} / ${p.country}</span></div><div class="info-row"><span class="info-label">Capacity</span><span class="info-value">${capa.toLocaleString()}K MT</span></div><div class="info-row"><span class="info-label">Current Status</span><span class="info-value" style="color:${(isC||isF)?'#E74C3C':'#27ae60'}">${status}</span></div><div class="history-container"><div class="history-title">🕒 STATUS HISTORY</div><div class="history-list">${buildHistoryItems(p.history)}</div></div></div>`);
             m.on('click', (e) => { L.DomEvent.stopPropagation(e); flyToTarget(p.lat, p.lng, 7, m); });
             activeMarkers.push(m); p._m = m;
+
+            const pCard = createPlantCard(p, total);
+            if(isC) document.getElementById('current-risk-list').appendChild(pCard.cloneNode(true)).onclick = pCard.onclick; 
+            else if(isF) document.getElementById('future-risk-list').appendChild(pCard.cloneNode(true)).onclick = pCard.onclick;
+            
             const r = p.region || "Unknown", c = p.country || "Other";
             if (!regs[r]) regs[r] = { name: r, countries: {}, totalP: 0, totalC: 0, sLat: 0, sLng: 0 };
             if (!regs[r].countries[c]) regs[r].countries[c] = { name: c, plants: [], cCapa: 0, sLat: 0, sLng: 0 };
-            const card = document.createElement('div'); card.className = 'plant-card'; card.innerHTML = `${(isC||isF)?`<span class="loss-badge">${loss}K</span>`:''}<b>${p.company}</b> <span style="color:#1597BB">(${((capa/total)*100).toFixed(1)}%)</span><div style="color:#666; font-size:0.65rem;">${capa}K | ${status}</div>`;
-            card.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); };
-            if(isC) document.getElementById('current-risk-list').appendChild(card.cloneNode(true)); else if(isF) document.getElementById('future-risk-list').appendChild(card.cloneNode(true));
-            regs[r].countries[c].plants.push(card); regs[r].countries[c].cCapa += capa; regs[r].countries[c].sLat += p.lat; regs[r].countries[c].sLng += p.lng;
+            regs[r].countries[c].plants.push(pCard); regs[r].countries[c].cCapa += capa; regs[r].countries[c].sLat += p.lat; regs[r].countries[c].sLng += p.lng;
             regs[r].totalP++; regs[r].totalC += capa; regs[r].sLat += p.lat; regs[r].sLng += p.lng;
         });
 
