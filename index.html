@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v10.6)</title>
+    <title>Global Supply Control Tower | JS KIM (v10.7)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="data/data_sm.js"></script>
     <script src="data/data_an.js"></script>
@@ -51,15 +51,11 @@
         .sync-spinner { width: 45px; height: 45px; border: 4px solid rgba(255,255,255,0.2); border-top: 4px solid #FFD700; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* ----------------------------------------------------------- */
-        /* ★ 세로형 팝업 & 이력 리스트 스타일 ★ */
-        /* ----------------------------------------------------------- */
         .info-row { display: flex; flex-direction: column; margin-bottom: 8px; border-bottom: 1px solid #f0f0f0; padding-bottom: 4px; }
         .info-label { font-size: 0.65rem; color: #888; font-weight: bold; text-transform: uppercase; }
         .info-value { font-size: 0.9rem; color: #222; font-weight: 700; }
         .custom-triangle svg { filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.2)); display: block; }
 
-        /* 신규: 이력 리스트 스타일 */
         .history-container { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--accent); }
         .history-title { font-size: 0.75rem; font-weight: 900; color: var(--accent); margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
         .history-list { display: flex; flex-direction: column; gap: 5px; max-height: 120px; overflow-y: auto; padding-right: 5px; }
@@ -125,7 +121,6 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    /* (중략: 기존 변수 및 설정 유지) */
     const ADMIN_PASS = "jskim0111";
     const SHEET_URLS = { 'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv', 'AN': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=263516767&single=true&output=csv', 'BD': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=607848019&single=true&output=csv' };
     
@@ -141,7 +136,6 @@
     let currentProd = 'SM', activeMarkers = [], currentRawData = [], currentTheme = 'light';
     map.on('baselayerchange', (e) => { currentTheme = (e.name === "Dark") ? 'dark' : 'light'; if (currentRawData.length > 0) renderEverything(currentRawData, currentProd); });
 
-    /* (중략: 기존 유틸리티 함수 유지) */
     function showUpdateModal() { document.getElementById('admin-password').value = ""; document.getElementById('auth-section').style.display = 'block'; document.getElementById('data-input-section').style.display = 'none'; document.getElementById('update-modal').style.display = 'block'; }
     function closeModal() { document.getElementById('update-modal').style.display = 'none'; }
     function verifyAdmin() { if (document.getElementById('admin-password').value === ADMIN_PASS) { document.getElementById('auth-section').style.display = 'none'; document.getElementById('data-input-section').style.display = 'block'; } else { alert("암호 불일치."); } }
@@ -187,21 +181,12 @@
         }
     }
 
-    // ★ 이력 렌더링 함수 ★
     function buildHistoryItems(historyStr) {
         if (!historyStr) return '<div style="color:#ccc; font-size:0.65rem; text-align:center; padding:10px;">기록이 없습니다.</div>';
-        
-        // 데이터 형식 예시: "Normal:2026-02-14|Shutdown:2026-02-10" 
-        // 시트의 'history' 컬럼에 위와 같이 파이프(|)와 콜론(:)으로 구분해서 넣어주시면 자동 출력됩니다.
         return historyStr.split('|').map(h => {
             const [status, time] = h.split(':');
-            const isShutdown = status.toLowerCase().includes('shutdown');
-            return `
-                <div class="history-item ${isShutdown ? 'shutdown' : ''}">
-                    <strong>${status}</strong>
-                    <span>${time}</span>
-                </div>
-            `;
+            const isShutdown = status && status.toLowerCase().includes('shutdown');
+            return `<div class="history-item ${isShutdown ? 'shutdown' : ''}"><strong>${status}</strong><span>${time}</span></div>`;
         }).join('');
     }
 
@@ -214,6 +199,9 @@
         let cL = 0, fL = 0; const regs = {};
         
         data.forEach(p => {
+            // ★ 신규: Deleted 상태면 지도와 리스트에서 아예 제외 ★
+            if (p.status && p.status.toLowerCase().includes('deleted')) return; 
+
             if(!p.lat || !p.lng) return;
             const status = p.status || "Normal", capa = parseFloat(p.capacity) || 0, days = parseFloat(p.days) || 0;
             const isC = status.includes('Current'), isF = status.includes('Future'), loss = ((capa / 365) * days).toFixed(1);
@@ -230,22 +218,17 @@
                 m = L.circleMarker([p.lat, p.lng], { radius: size, fillColor: colors.f, color: colors.b, weight: 2, fillOpacity: 0.95, stroke: true }).addTo(map);
             }
             
-            // ★ 업데이트된 팝업 렌더링 (이력 추가) ★
             const popupHTML = `
                 <div style="min-width:210px; font-family:'Pretendard'; padding:5px;">
                     <div style="font-size:1.1rem; font-weight:900; color:var(--primary); margin-bottom:10px; border-bottom:2px solid var(--accent); padding-bottom:5px;">${p.company}</div>
                     <div class="info-row"><span class="info-label">Region / Country</span><span class="info-value">${p.region} / ${p.country}</span></div>
                     <div class="info-row"><span class="info-label">Capacity</span><span class="info-value">${capa.toLocaleString()}K MT</span></div>
                     <div class="info-row"><span class="info-label">Current Status</span><span class="info-value" style="color:${(isC||isF)?'#E74C3C':'#27ae60'}">${status}</span></div>
-                    
                     <div class="history-container">
                         <div class="history-title">🕒 STATUS HISTORY</div>
-                        <div class="history-list">
-                            ${buildHistoryItems(p.history)}
-                        </div>
+                        <div class="history-list">${buildHistoryItems(p.history)}</div>
                     </div>
-                </div>
-            `;
+                </div>`;
             m.bindPopup(popupHTML);
             m.on('click', (e) => { L.DomEvent.stopPropagation(e); flyToTarget(p.lat, p.lng, 7, m); });
             activeMarkers.push(m); p._m = m;
