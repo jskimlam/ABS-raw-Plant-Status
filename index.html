@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v11.4)</title>
+    <title>Global Supply Control Tower | JS KIM (v11.5)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
@@ -43,13 +43,16 @@
         .sync-spinner { width: 45px; height: 45px; border: 4px solid rgba(255,255,255,0.2); border-top: 4px solid #FFD700; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* 히스토리 테이블 스타일 */
+        /* 히스토리 및 정보 스타일 */
         .history-container { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--accent); }
         .history-title { font-size: 0.75rem; font-weight: 900; color: var(--accent); margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
         .history-table { width: 100%; border-collapse: collapse; font-size: 0.68rem; text-align: left; }
         .history-table th { color: #888; padding: 4px; border-bottom: 1px solid #eee; }
         .history-table td { padding: 6px 4px; border-bottom: 1px solid #f9f9f9; }
         .status-tag { padding: 2px 4px; border-radius: 4px; font-weight: bold; color: white; font-size: 0.6rem; }
+        .info-row { display: flex; flex-direction: column; margin-bottom: 8px; border-bottom: 1px solid #f0f0f0; padding-bottom: 4px; }
+        .info-label { font-size: 0.65rem; color: #888; font-weight: bold; text-transform: uppercase; }
+        .info-value { font-size: 0.9rem; color: #222; font-weight: 700; }
 
         #chart-panel { position: fixed; bottom: 0; left: 0; width: 100%; background: white; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.2); z-index: 3000; padding: 20px; box-sizing: border-box; transition: transform 0.3s ease-in-out; transform: translateY(100%); max-height: 50vh; overflow: hidden; display: flex; flex-direction: column; }
         #chart-panel.active { transform: translateY(0); }
@@ -140,27 +143,20 @@
     function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
     function closeChartPanel() { document.getElementById('chart-panel').classList.remove('active'); }
 
-    // 표 형식의 히스토리 렌더링 함수
     function buildHistoryItems(historyStr) {
         if (!historyStr) return '<div style="color:#ccc; font-size:0.65rem; text-align:center; padding:10px;">기록이 없습니다.</div>';
         const rows = historyStr.split('|').map(h => {
             const parts = h.split(':');
-            const status = parts[0] || "-";
-            const date = parts[1] || "-";
-            const days = parts[2] || "0";
-            const period = parts[3] || "-";
+            const status = parts[0] || "-"; const date = parts[1] || "-"; const days = parts[2] || "0"; const period = parts[3] || "-";
             const color = status.toLowerCase().includes('shutdown') || status.toLowerCase().includes('maintain') ? '#E74C3C' : '#27ae60';
             return `<tr><td><span class="status-tag" style="background:${color}">${status}</span></td><td>${date}</td><td><b>${days}d</b></td><td>${period}</td></tr>`;
         }).join('');
         return `<table class="history-table"><thead><tr><th>상태</th><th>날짜</th><th>일수</th><th>주기</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
-    // 클릭 가능한 업체 카드 생성 함수
     function createPlantCard(p, totalCapa) {
-        const status = p.status || "Normal", capa = parseFloat(p.capacity) || 0, days = parseFloat(p.days) || 0;
-        const isC = status.includes('Current'), isF = status.includes('Future'), loss = ((capa / 365) * days).toFixed(1);
-        const card = document.createElement('div');
-        card.className = 'plant-card';
+        const status = p.status || "Normal", capa = parseFloat(p.capacity) || 0, days = parseFloat(p.days) || 0, isC = status.includes('Current'), isF = status.includes('Future'), loss = ((capa / 365) * days).toFixed(1);
+        const card = document.createElement('div'); card.className = 'plant-card';
         card.innerHTML = `${(isC||isF)?`<span class="loss-badge">${loss}K</span>`:''}<b>${p.company}</b> <span style="color:#1597BB">(${((capa/totalCapa)*100).toFixed(1)}%)</span><div style="color:#666; font-size:0.65rem;">${capa}K | ${status}</div>`;
         card.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); };
         return card;
@@ -197,6 +193,7 @@
         activeData.forEach(p => {
             if(!p.lat || !p.lng) return;
             const status = p.status || "Normal", capa = parseFloat(p.capacity) || 0, days = parseFloat(p.days) || 0, isC = status.includes('Current'), isF = status.includes('Future'), loss = ((capa / 365) * days).toFixed(1);
+            const sDate = p.start_date || "-", eDate = p.end_date || "-";
             if(isC) cL += parseFloat(loss); if(isF) fL += parseFloat(loss);
             const size = Math.sqrt(capa) * 0.55; let m;
             if (isC || isF) {
@@ -207,7 +204,8 @@
                 const c = regCols[currentTheme][p.region] || regCols[currentTheme].Other;
                 m = L.circleMarker([p.lat, p.lng], { radius: size, fillColor: c.f, color: c.b, weight: 2, fillOpacity: 0.95, stroke: true }).addTo(map);
             }
-            m.bindPopup(`<div style="min-width:270px; font-family:'Pretendard'; padding:5px;"><div style="font-size:1.1rem; font-weight:900; color:var(--primary); margin-bottom:10px; border-bottom:2px solid var(--accent); padding-bottom:5px;">${p.company}</div><div class="info-row"><span class="info-label">Region / Country</span><span class="info-value">${p.region} / ${p.country}</span></div><div class="info-row"><span class="info-label">Capacity</span><span class="info-value">${capa.toLocaleString()}K MT</span></div><div class="info-row"><span class="info-label">Current Status</span><span class="info-value" style="color:${(isC||isF)?'#E74C3C':'#27ae60'}">${status}</span></div><div class="history-container"><div class="history-title">🕒 STATUS HISTORY</div><div class="history-list">${buildHistoryItems(p.history)}</div></div></div>`);
+            // ★ 수정: 가동정지 기간(From ~ To) 표시 추가 ★
+            m.bindPopup(`<div style="min-width:270px; font-family:'Pretendard'; padding:5px;"><div style="font-size:1.1rem; font-weight:900; color:var(--primary); margin-bottom:10px; border-bottom:2px solid var(--accent); padding-bottom:5px;">${p.company}</div><div class="info-row"><span class="info-label">Region / Country</span><span class="info-value">${p.region} / ${p.country}</span></div><div class="info-row"><span class="info-label">Current Status</span><span class="info-value" style="color:${(isC||isF)?'#E74C3C':'#27ae60'}">${status} ${(isC||isF)?`(${sDate} ~ ${eDate})`:''}</span></div><div class="info-row"><span class="info-label">Capacity (Loss)</span><span class="info-value">${capa.toLocaleString()}K MT ${(isC||isF)?`<span style="color:#E74C3C">(-${loss}K)</span>`:''}</span></div><div class="history-container"><div class="history-title">🕒 STATUS HISTORY</div><div class="history-list">${buildHistoryItems(p.history)}</div></div></div>`);
             m.on('click', (e) => { L.DomEvent.stopPropagation(e); flyToTarget(p.lat, p.lng, 7, m); });
             activeMarkers.push(m); p._m = m;
             const pCard = createPlantCard(p, total);
