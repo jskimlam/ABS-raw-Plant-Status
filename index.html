@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v13.4)</title>
+    <title>Global Supply Control Tower | JS KIM (v13.6)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
@@ -149,26 +149,29 @@
     function closeModal() { document.getElementById('update-modal').style.display = 'none'; }
     function verifyAdmin() { if (document.getElementById('admin-password').value === ADMIN_PASS) { document.getElementById('auth-section').style.display = 'none'; document.getElementById('data-input-section').style.display = 'block'; } else { alert("암호 불일치."); } }
    
-    // 2. 스마트 데이터 파싱 (헤더 공백 처리 강화)
+    // 2. 스마트 데이터 파싱 (컬럼명 및 데이터 정제)
     function parseUniversal(text) {
         const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
         if(lines.length < 2) return [];
         const del = lines[0].includes('\t') ? '\t' : ',';
-        // 헤더 전처리: 공백을 언더바로, 소문자로, 특수문자 제거
         const heads = lines[0].split(del).map(h => h.trim().toLowerCase().replace(/\s+/g, '_').replace(/[().]/g, ''));
+        
         return lines.slice(1).map(line => {
             const vals = line.split(del); let obj = {};
             heads.forEach((h, i) => {
                 let v = vals[i] ? vals[i].trim() : "";
-                // 키워드 매핑으로 안전하게 데이터 가져오기
-                if(h.includes('capacity')) obj['capacity'] = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0;
+                // Capa, Capacity, KMT 등 허용
+                if(h.includes('capa') || h.includes('kmt')) obj['capacity'] = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0;
                 else if(h.includes('lat')) obj['lat'] = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0;
                 else if(h.includes('lng') || h.includes('long')) obj['lng'] = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0;
-                else if(h.includes('start') && h.includes('date')) obj['start_date'] = v;
-                else if(h.includes('end') && h.includes('date')) obj['end_date'] = v;
+                // Start Date 유연성
+                else if(h.includes('start') || h.includes('begin')) obj['start_date'] = v;
+                // End Date 유연성
+                else if(h.includes('end') || h.includes('finish')) obj['end_date'] = v;
+                // Status 유연성
+                else if(h.includes('status') || h.includes('remark') || h.includes('rmk')) obj['status'] = v;
                 else obj[h] = v;
             });
-            // 기본값 보정
             if(!obj.company) obj.company = obj.site || obj.plant || "Unknown";
             return obj;
         });
@@ -181,17 +184,31 @@
         if(marker) map.once('moveend', () => marker.openPopup());
     }
 
+    // 날짜 파싱 헬퍼 함수 (점, 대시, 슬래시 모두 처리)
+    function cleanDateStr(dStr) {
+        if(!dStr) return "";
+        // 2024.1.1 -> 2024-1-1 변환
+        return dStr.replace(/\./g, '-').replace(/\//g, '-').trim();
+    }
+
     function getLossDays(startStr, endStr, mode) {
-        if (!startStr || !endStr || startStr === "" || endStr === "") return 0;
-        const pS = new Date(startStr); const pE = new Date(endStr);
+        if (!startStr || !endStr) return 0;
+        
+        const s = cleanDateStr(startStr);
+        const e = cleanDateStr(endStr);
+        
+        const pS = new Date(s); 
+        const pE = new Date(e);
+        
         if (isNaN(pS) || isNaN(pE)) return 0;
         
         if (mode === 'total') return Math.max(0, Math.floor((pE - pS) / 86400000) + 1);
         
-        // 기준 날짜: 2026-02-17
+        // 2026-02-17 기준 고정 (JS Kim Rule)
         const now = new Date(2026, 1, 17); 
         const mS = new Date(now.getFullYear(), now.getMonth(), 1);
         const mE = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        
         const iS = new Date(Math.max(mS, pS)); 
         const iE = new Date(Math.min(mE, pE));
         
@@ -219,7 +236,6 @@
         card.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); }; return card;
     }
 
-    // 3. 차트 표시 함수 복구 (파이 차트)
     function showCountryStats(countryName) {
         const countryData = currentRawData.filter(p => (p.country || "").trim() === countryName && !(p.status && p.status.toString().toLowerCase().includes('deleted')));
         if (countryData.length === 0) return;
@@ -311,6 +327,8 @@
         activeData.forEach(p => {
             if(!p.lat || !p.lng) return;
             const capa = parseFloat(p.capacity) || 0;
+            
+            // 3. 강력한 로스 계산 (AN/BD 호환성 핵심)
             const mDays = getLossDays(p.start_date, p.end_date, 'month');
             const tDays = getLossDays(p.start_date, p.end_date, 'total');
             const mLoss = (capa / 365) * mDays; 
@@ -318,8 +336,13 @@
            
             const statusStr = (p.status || "").toString().trim();
             const statusLower = statusStr.toLowerCase();
-            const isC = statusLower.includes('current');
-            const isF = statusLower.includes('future');
+
+            // 중요: Status에 'Current'라는 단어가 없어도, 
+            // 계산된 이번달 손실(mLoss)이 0보다 크면 무조건 Current Risk로 강제 편입
+            let isC = statusLower.includes('current') || (mLoss > 0);
+            
+            // Future는 Current가 아니면서 미래 정지 일수가 남아있는 경우
+            let isF = statusLower.includes('future') || (!isC && tDays > 0);
             
             if(isC) totalCurrentLoss += mLoss;
 
@@ -386,7 +409,7 @@
     function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
     function closeChartPanel() { document.getElementById('chart-panel').classList.remove('active'); }
     
-    // 글로벌(window) 스코프에 함수 등록 (HTML onclick 호출용)
+    // 글로벌 함수 등록
     window.showCountryStats = showCountryStats;
 
     window.onload = () => switchProduct('SM');
