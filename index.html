@@ -2,56 +2,43 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v11.8)</title>
+    <title>Global Supply Control Tower | JS KIM (v11.9)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="data/data_sm.js"></script>
     <script src="data/data_an.js"></script>
     <script src="data/data_bd.js"></script>
     <style>
-        :root { --primary: #0A2647; --accent: #1597BB; --current: #1A1A1B; --future: #D35400; --bg: #F0F5F9; }
+        :root { --primary: #0A2647; --accent: #1597BB; --bg: #F0F5F9; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Pretendard', sans-serif; overflow: hidden; }
-        #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
-        #map { flex-grow: 1; height: 100%; background: #0b192e; z-index: 1; }
-        #sidebar { position: absolute; left: 0; top: 0; width: 360px; height: 100%; background: white; z-index: 2000; transition: transform 0.4s ease; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
-        #sidebar.hidden { transform: translateX(-100%); }
-        #toggle-btn { position: absolute; right: -45px; top: 20px; width: 45px; height: 45px; background: var(--primary); color: white; border: none; cursor: pointer; border-radius: 0 8px 8px 0; font-size: 18px; z-index: 2001; }
-        .header { background: var(--primary); color: white; padding: 25px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .created-by { font-size: 1.3rem; color: #FFD700; font-weight: 900; display: block; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        #layout { display: flex; height: 100vh; width: 100vw; }
+        #map { flex-grow: 1; height: 100%; background: #0b192e; }
+        #sidebar { width: 360px; height: 100%; background: white; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; z-index: 2000; }
+        .header { background: var(--primary); color: white; padding: 20px; }
+        .created-by { font-size: 1.2rem; color: #FFD700; font-weight: 900; }
         .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; background: var(--accent); color: white; gap: 1px; }
-        .metric-box { padding: 12px; background: var(--accent); text-align: center; }
-        .metric-value { font-size: 1.25rem; font-weight: 900; }
-        #list-container { flex-grow: 1; overflow-y: auto; background: var(--bg); }
-        .history-container { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--accent); }
-        .history-table { width: 100%; border-collapse: collapse; font-size: 0.68rem; text-align: left; }
-        .status-tag { padding: 2px 4px; border-radius: 4px; font-weight: bold; color: white; font-size: 0.6rem; }
-        .info-row { display: flex; flex-direction: column; margin-bottom: 8px; border-bottom: 1px solid #f0f0f0; }
-        .info-label { font-size: 0.65rem; color: #888; font-weight: bold; }
-        .info-value { font-size: 0.9rem; color: #222; font-weight: 700; }
+        .metric-box { padding: 15px; text-align: center; background: var(--accent); }
+        .metric-value { font-size: 1.3rem; font-weight: 900; }
+        #list-container { flex-grow: 1; overflow-y: auto; background: var(--bg); padding: 10px; }
+        .history-table { width: 100%; border-collapse: collapse; font-size: 0.7rem; margin-top: 10px; }
+        .status-tag { padding: 2px 5px; border-radius: 4px; color: white; font-weight: bold; font-size: 0.65rem; }
     </style>
 </head>
 <body>
 
 <div id="layout">
     <div id="sidebar">
-        <button id="toggle-btn" onclick="document.getElementById('sidebar').classList.toggle('hidden')">☰</button>
-        <div class="product-tabs" style="display:flex; background:#051937; padding:5px; gap:4px;">
-            <button class="tab-btn" id="btn-SM" onclick="switchProduct('SM')" style="flex:1; padding:10px; cursor:pointer;">SM</button>
-            <button class="tab-btn" id="btn-AN" onclick="switchProduct('AN')" style="flex:1; padding:10px; cursor:pointer;">AN</button>
-            <button class="tab-btn" id="btn-BD" onclick="switchProduct('BD')" style="flex:1; padding:10px; cursor:pointer;">BD</button>
-        </div>
         <div class="header">
             <span class="created-by">CREATED BY JS KIM OF LAM</span>
-            <h1 style="margin:0; font-size:1.1rem;">Global Supply Control Map</h1>
+            <h1 style="margin:5px 0 0 0; font-size:1.1rem;">Global Supply Control Map</h1>
         </div>
         <div class="metrics-grid">
             <div class="metric-box"><span>GLOBAL CAPA</span><span class="metric-value" id="global-val">0</span></div>
             <div class="metric-box"><span>TOTAL SITES</span><span class="metric-value" id="total-sites">0</span></div>
-            <div class="metric-box" style="background: #1A1A1B;"><span>MONTH LOSS %</span><span class="metric-value" id="cur-ratio" style="color:#FF4D4D">0.00%</span></div>
-            <div class="metric-box" style="background: #D35400;"><span>MONTH LOSS MT</span><span class="metric-value" id="cur-loss-val" style="color:#FFD700">0K</span></div>
+            <div class="metric-box" style="background:#1A1A1B;"><span>MONTH LOSS %</span><span class="metric-value" id="cur-ratio" style="color:#FF4D4D">0.00%</span></div>
+            <div class="metric-box" style="background:#1A1A1B;"><span>MONTH LOSS MT</span><span class="metric-value" id="cur-loss-mt" style="color:#FFD700">0K</span></div>
         </div>
         <div id="list-container">
-            <div id="risk-list" style="padding:10px;"></div>
             <div id="region-list"></div>
         </div>
     </div>
@@ -60,28 +47,26 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    const SHEET_URLS = { 'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv', 'AN': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=263516767&single=true&output=csv', 'BD': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=607848019&single=true&output=csv' };
+    const SHEET_URLS = { 'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv' };
     const map = L.map('map', {zoomControl: false}).setView([20, 100], 3);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
-    let activeMarkers = [];
 
-    function getMonthIntersectionDays(startDateStr, endDateStr) {
-        if (!startDateStr || !endDateStr) return 0;
+    function getMonthIntersectionDays(startStr, endStr) {
+        if (!startStr || !endStr) return 0;
         const now = new Date();
         const mStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const mEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        const pStart = new Date(startDateStr);
-        const pEnd = new Date(endDateStr);
+        const pStart = new Date(startStr);
+        const pEnd = new Date(endStr);
         if (isNaN(pStart) || isNaN(pEnd)) return 0;
         const iStart = new Date(Math.max(mStart, pStart));
         const iEnd = new Date(Math.min(mEnd, pEnd));
-        if (iStart > iEnd) return 0;
-        return Math.floor((iEnd - iStart) / (1000 * 60 * 60 * 24)) + 1;
+        return (iStart > iEnd) ? 0 : Math.floor((iEnd - iStart) / 86400000) + 1;
     }
 
-    function buildHistoryItems(summaryStr) {
-        if (!summaryStr || summaryStr === "0") return '<div style="color:#ccc; font-size:0.65rem; text-align:center; padding:10px;">기록이 없습니다.</div>';
-        const rows = summaryStr.split('|').map(h => {
+    function buildHistory(summary) {
+        if (!summary || summary === "0") return '<div style="color:#ccc; padding:10px; text-align:center;">기록 없음</div>';
+        const rows = summary.split('|').map(h => {
             const p = h.split(':');
             if (p.length < 2 || p[1].includes('1899')) return '';
             const isW = p[0].toLowerCase().includes('shutdown') || p[0].toLowerCase().includes('maintenance');
@@ -90,55 +75,44 @@
         return `<table class="history-table"><tbody>${rows}</tbody></table>`;
     }
 
-    function renderEverything(data) {
-        activeMarkers.forEach(m => map.removeLayer(m)); activeMarkers = [];
-        document.getElementById('risk-list').innerHTML = '';
-        
-        // ★ 사장님 시트의 "Deleted" 업체 필터링 ★
-        const activeData = data.filter(p => !(p.status && p.status.toLowerCase().includes('deleted')));
-        const totalCapa = activeData.reduce((s, p) => s + (parseFloat(p.capacity) || 0), 0);
-        document.getElementById('global-val').innerText = Math.round(totalCapa).toLocaleString();
-        document.getElementById('total-sites').innerText = activeData.length;
-
-        let curMonthLoss = 0;
-        const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-
-        activeData.forEach(p => {
-            if(!p.lat || !p.lng) return;
-            const capa = parseFloat(p.capacity) || 0;
-            // ★ 사장님 시트의 Column_11, Column_12 날짜 사용 ★
-            const cDays = getMonthIntersectionDays(p.column_11, p.column_12);
-            const cLoss = (capa / 365) * cDays;
-            curMonthLoss += cLoss;
-
-            const size = Math.sqrt(capa) * 0.55;
-            const isRisk = p.status.includes('Shutdown') || p.status.includes('Maintenance');
-            
-            const m = (isRisk) ? 
-                L.marker([p.lat, p.lng], { icon: L.divIcon({ html: `<svg width="${size*2}" height="${size*2}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="#1A1A1B" stroke="white" stroke-width="2"/></svg>`, className: 'risk-icon' }) }).addTo(map) :
-                L.circleMarker([p.lat, p.lng], { radius: size, fillColor: '#5DADE2', fillOpacity: 0.8 }).addTo(map);
-
-            // ★ 사장님 시트의 "Summary" 컬럼을 히스토리로 사용 ★
-            m.bindPopup(`<div style="min-width:250px;"><b>${p.company}</b><br><span style="color:#E74C3C; font-weight:900;">${p.status}</span><br>Month Loss: ${cLoss.toFixed(1)}K MT<div class="history-container"><b>STATUS HISTORY</b>${buildHistoryItems(p.summary)}</div></div>`);
-            activeMarkers.push(m);
-        });
-
-        const monthlyTotal = (totalCapa / 365) * daysInMonth;
-        document.getElementById('cur-ratio').innerText = ((curMonthLoss/monthlyTotal)*100).toFixed(2) + "%";
-        document.getElementById('cur-loss-val').innerText = curMonthLoss.toFixed(1) + "K MT";
-    }
-
     async function switchProduct(prod) {
         const res = await fetch(SHEET_URLS[prod] + "&t=" + new Date().getTime());
-        const text = await res.text();
-        const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+        const lines = (await res.text()).split("\n").filter(l => l.trim().length > 0);
         const heads = lines[0].split(',').map(h => h.trim().toLowerCase());
         const data = lines.slice(1).map(line => {
             const vals = line.split(','); let obj = {};
             heads.forEach((h, i) => { obj[h] = vals[i] ? vals[i].trim() : ""; });
             return obj;
         });
-        renderEverything(data);
+
+        const activeData = data.filter(p => !(p.status && p.status.toLowerCase().includes('deleted')));
+        const totalCapa = activeData.reduce((s, p) => s + (parseFloat(p.capacity) || 0), 0);
+        let curLoss = 0;
+
+        activeData.forEach(p => {
+            if(!p.lat || !p.lng) return;
+            // ★ 바뀐 머릿말 이름 적용 (start_date, end_date) ★
+            const cDays = getMonthIntersectionDays(p.start_date, p.end_date);
+            const capa = parseFloat(p.capacity) || 0;
+            const loss = (capa / 365) * cDays;
+            curLoss += loss;
+
+            const size = Math.sqrt(capa) * 0.55;
+            const isR = p.status.includes('Shutdown') || p.status.includes('Maintenance');
+            
+            const m = isR ? 
+                L.marker([p.lat, p.lng], { icon: L.divIcon({ html: `<svg width="${size*2}" height="${size*2}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="#1A1A1B" stroke="white" stroke-width="2"/></svg>` }) }).addTo(map) :
+                L.circleMarker([p.lat, p.lng], { radius: size, fillColor: '#5DADE2', fillOpacity: 0.8 }).addTo(map);
+
+            m.bindPopup(`<b>${p.company}</b><br><span style="color:#E74C3C; font-weight:900;">${p.status}</span><br>Month Loss: ${loss.toFixed(1)}K MT<div style="margin-top:10px; border-top:1px dashed #ccc; padding-top:5px;"><b>HISTORY</b>${buildHistory(p.summary)}</div>`);
+        });
+
+        const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+        const monthlyTotal = (totalCapa / 365) * daysInMonth;
+        document.getElementById('global-val').innerText = Math.round(totalCapa).toLocaleString();
+        document.getElementById('total-sites').innerText = activeData.length;
+        document.getElementById('cur-ratio').innerText = ((curLoss/monthlyTotal)*100).toFixed(2) + "%";
+        document.getElementById('cur-loss-mt').innerText = curLoss.toFixed(1) + "K MT";
     }
     window.onload = () => switchProduct('SM');
 </script>
