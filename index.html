@@ -142,18 +142,31 @@
     function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
     function closeChartPanel() { document.getElementById('chart-panel').classList.remove('active'); }
 
-    /* [고정밀 듀얼 로스 계산 엔진 - NaN 방지] */
-    function getLossDays(startStr, endStr, mode) {
-        if (!startStr || !endStr) return 0;
-        const pS = new Date(startStr); const pE = new Date(endStr);
-        if (isNaN(pS) || isNaN(pE)) return 0;
-        if (mode === 'total') return Math.max(0, Math.floor((pE - pS) / 86400000) + 1);
-        const now = new Date(); // 2026-02-17 기준
-        const mS = new Date(now.getFullYear(), now.getMonth(), 1);
-        const mE = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        const iS = new Date(Math.max(mS, pS)); const iE = new Date(Math.min(mE, pE));
-        return (iS > iE) ? 0 : Math.floor((iE - iS) / 86400000) + 1;
-    }
+/* [v13.2 패치] 마침표 날짜 대응 및 텍스트 필터링 엔진 */
+function getLossDays(startStr, endStr, mode) {
+    if (!startStr) return 0;
+    const parse = (s) => {
+        if(!s) return null;
+        // 2026.01.01 형태를 2026-01-01로 표준화하여 인식
+        let d = new Date(String(s).replace(/\./g, '-').trim());
+        return isNaN(d) ? null : d;
+    };
+    const pS = parse(startStr); 
+    let pE = parse(endStr);
+    
+    if (!pS) return 0;
+    // 종료일이 비었거나 텍스트면 '무기한'으로 간주하여 아주 먼 미래 설정
+    if (!pE) pE = new Date("2099-12-31"); 
+
+    if (mode === 'total') return Math.max(0, Math.floor((pE - pS) / 86400000) + 1);
+
+    const now = new Date(); // 2026-02-17
+    const mS = new Date(now.getFullYear(), now.getMonth(), 1);
+    const mE = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const iS = new Date(Math.max(mS, pS)); 
+    const iE = new Date(Math.min(mE, pE));
+    return (iS > iE) ? 0 : Math.floor((iE - iS) / 86400000) + 1;
+}
 
     /* [히스토리 빌더 완벽 복구 - 1899 필터링 포함] */
     function buildHistoryItems(summaryStr) {
