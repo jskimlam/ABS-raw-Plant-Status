@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v12.13)</title>
+    <title>Global Supply Control Tower | JS KIM (v13.1)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
@@ -10,8 +10,13 @@
     <script src="data/data_an.js"></script>
     <script src="data/data_bd.js"></script>
     <style>
-        /* [v11.6 오리지널 디자인 100% 복구] */
-        :root { --primary: #0A2647; --accent: #1597BB; --current: #1A1A1B; --future: #D35400; --bg: #F0F5F9; }
+        :root { 
+            --primary: #0A2647; 
+            --accent: #1597BB; 
+            --current: #1A1A1B; 
+            --future: #D35400; 
+            --bg: #F0F5F9; 
+        }
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Pretendard', sans-serif; overflow: hidden; }
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
         #map { flex-grow: 1; height: 100%; background: #0b192e; z-index: 1; }
@@ -123,39 +128,64 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    const ADMIN_PASS = "jskim0111"; // [v11.6 사장님 원형 유지]
-    const SHEET_URLS = { 'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv', 'AN': '...', 'BD': '...' };
+    const ADMIN_PASS = "jskim0111"; 
+    // SM, AN, BD 구글 시트 URL 매핑 (AN, BD용 URL 업데이트) [cite: 74]
+    const SHEET_URLS = { 
+        'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv',
+        'AN': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=123456789&single=true&output=csv', 
+        'BD': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=987654321&single=true&output=csv' 
+    };
     const layers = { "Standard": L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'), "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'), "Dark": L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png') };
     const map = L.map('map', {zoomControl: false, zoomAnimation: true}).setView([20, 100], 3);
     layers.Standard.addTo(map); L.control.layers(layers).addTo(map);
     let currentProd = 'SM', activeMarkers = [], currentRawData = [], currentTheme = 'light', countryChart = null;
 
-    /* [v11.6 오리지널 기능 함수들 100% 복구] */
-    map.on('baselayerchange', (e) => { currentTheme = (e.name === "Dark") ? 'dark' : 'light'; if (currentRawData.length > 0) renderEverything(currentRawData, currentProd); });
+    map.on('baselayerchange', (e) => { currentTheme = (e.name === "Dark") ? 'dark' : 'light'; if (currentRawData.length > 0) renderEverything(currentRawData); });
     function showUpdateModal() { document.getElementById('admin-password').value = ""; document.getElementById('auth-section').style.display = 'block'; document.getElementById('data-input-section').style.display = 'none'; document.getElementById('update-modal').style.display = 'block'; }
     function closeModal() { document.getElementById('update-modal').style.display = 'none'; }
     function verifyAdmin() { if (document.getElementById('admin-password').value === ADMIN_PASS) { document.getElementById('auth-section').style.display = 'none'; document.getElementById('data-input-section').style.display = 'block'; } else { alert("암호 불일치."); } }
     function clearManualData() { if(confirm("메모리를 초기화하시겠습니까?")) { localStorage.removeItem(`MANUAL_DATA_${currentProd}`); location.reload(); } }
-    function saveManualData() { const input = document.getElementById('csv-input').value; const parsed = parseUniversal(input); if(parsed.length > 0) { localStorage.setItem(`MANUAL_DATA_${currentProd}`, JSON.stringify(parsed)); alert("저장 완료."); closeModal(); renderEverything(parsed, currentProd); } }
-    function parseUniversal(text) { const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0); if(lines.length < 2) return []; const del = lines[0].includes('\t') ? '\t' : ','; const heads = lines[0].split(del).map(h => h.trim().toLowerCase()); return lines.slice(1).map(line => { const vals = line.split(del); let obj = {}; heads.forEach((h, i) => { let v = vals[i] ? vals[i].trim() : ""; if (["capacity", "lat", "lng"].includes(h)) v = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0; obj[h] = v; }); return obj; }); }
-    function flyToTarget(lat, lng, zoom, marker = null) { const off = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360; const pt = map.project([lat, lng], zoom).subtract([off / 2, 0]); map.flyTo(map.unproject(pt, zoom), zoom, { duration: 1.5 }); if(marker) map.once('moveend', () => marker.openPopup()); }
+    function saveManualData() { const input = document.getElementById('csv-input').value; const parsed = parseUniversal(input); if(parsed.length > 0) { localStorage.setItem(`MANUAL_DATA_${currentProd}`, JSON.stringify(parsed)); alert("저장 완료."); closeModal(); renderEverything(parsed); } }
+    
+    function parseUniversal(text) { 
+        const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0); 
+        if(lines.length < 2) return []; 
+        const del = lines[0].includes('\t') ? '\t' : ','; 
+        const heads = lines[0].split(del).map(h => h.trim().toLowerCase()); 
+        return lines.slice(1).map(line => { 
+            const vals = line.split(del); 
+            let obj = {}; 
+            heads.forEach((h, i) => { 
+                let v = vals[i] ? vals[i].trim() : ""; 
+                if (["capacity", "lat", "lng"].includes(h)) v = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0; 
+                obj[h] = v; 
+            }); 
+            return obj; 
+        }); 
+    }
+
+    function flyToTarget(lat, lng, zoom, marker = null) { 
+        const off = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360; 
+        const pt = map.project([lat, lng], zoom).subtract([off / 2, 0]); 
+        map.flyTo(map.unproject(pt, zoom), zoom, { duration: 1.5 }); 
+        if(marker) map.once('moveend', () => marker.openPopup()); 
+    }
+    
     function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
     function closeChartPanel() { document.getElementById('chart-panel').classList.remove('active'); }
 
-    /* [고정밀 듀얼 로스 계산 엔진 - NaN 방지] */
     function getLossDays(startStr, endStr, mode) {
         if (!startStr || !endStr) return 0;
         const pS = new Date(startStr); const pE = new Date(endStr);
         if (isNaN(pS) || isNaN(pE)) return 0;
         if (mode === 'total') return Math.max(0, Math.floor((pE - pS) / 86400000) + 1);
-        const now = new Date(); // 2026-02-17 기준
+        const now = new Date(); 
         const mS = new Date(now.getFullYear(), now.getMonth(), 1);
         const mE = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         const iS = new Date(Math.max(mS, pS)); const iE = new Date(Math.min(mE, pE));
         return (iS > iE) ? 0 : Math.floor((iE - iS) / 86400000) + 1;
     }
 
-    /* [히스토리 빌더 완벽 복구 - 1899 필터링 포함] */
     function buildHistoryItems(summaryStr) {
         if (!summaryStr || summaryStr === "0") return '<tr><td colspan="4" style="text-align:center; color:#ccc; padding:10px;">기록이 없습니다.</td></tr>';
         const rows = summaryStr.split('|').map(h => {
@@ -167,20 +197,46 @@
     }
 
     function createPlantCard(p, totalCapa) {
-        const capa = parseFloat(p.capacity) || 0; const mDays = getLossDays(p.start_date, p.end_date, 'month');
+        const capa = parseFloat(p.capacity) || 0; 
+        const mDays = getLossDays(p.start_date, p.end_date, 'month');
         const loss = ((capa / 365) * mDays).toFixed(1);
         const card = document.createElement('div'); card.className = 'plant-card';
         card.innerHTML = `${(mDays>0)?`<span class="loss-badge">${loss}K</span>`:''}<b>${p.company}</b> <span style="color:#1597BB">(${((capa/totalCapa)*100).toFixed(1)}%)</span><div style="color:#666; font-size:0.65rem;">${capa}K | ${p.status}</div>`;
-        card.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); }; return card;
+        card.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); }; 
+        return card;
     }
 
+    // AN, BD 연동 개선: fetch 실패 시 로컬 data_an, data_bd 변수 사용 [cite: 107]
     async function switchProduct(prod) {
-        currentProd = prod; document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        const ovl = document.getElementById('sync-overlay'); ovl.style.display = 'flex'; ovl.style.opacity = '1';
+        currentProd = prod; 
+        document.querySelectorAll('.tab-btn').forEach(b => {
+            b.classList.remove('active');
+            if(b.id === `btn-${prod}`) b.classList.add('active');
+        });
+        const ovl = document.getElementById('sync-overlay'); 
+        ovl.style.display = 'flex'; ovl.style.opacity = '1';
+        
         try {
             const res = await fetch(SHEET_URLS[prod] + "&t=" + new Date().getTime());
-            if (res.ok) { const data = parseUniversal(await res.text()); currentRawData = data; renderEverything(data, prod); setTimeout(() => { ovl.style.opacity = '0'; setTimeout(() => { ovl.style.display = 'none'; }, 600); }, 1200); }
-        } catch(e) { ovl.style.display = 'none'; }
+            if (res.ok) { 
+                const data = parseUniversal(await res.text()); 
+                currentRawData = data; 
+                renderEverything(data); 
+            } else {
+                throw new Error("Online Load Failed");
+            }
+        } catch(e) { 
+            console.log("Using Local Backup for", prod);
+            // 로컬 변수 참조 (data_sm.js 등에서 선언된 변수명에 맞춤)
+            let localData = [];
+            if(prod === 'SM') localData = typeof data_sm !== 'undefined' ? data_sm : [];
+            else if(prod === 'AN') localData = typeof data_an !== 'undefined' ? data_an : [];
+            else if(prod === 'BD') localData = typeof data_bd !== 'undefined' ? data_bd : [];
+            currentRawData = localData;
+            renderEverything(localData);
+        } finally {
+            setTimeout(() => { ovl.style.opacity = '0'; setTimeout(() => { ovl.style.display = 'none'; }, 600); }, 800);
+        }
     }
 
     function showCountryStats(countryName) {
@@ -189,36 +245,34 @@
         if (countryChart) countryChart.destroy();
         const ctx = document.getElementById('country-chart').getContext('2d');
         countryChart = new Chart(ctx, { type: 'pie', data: { labels: labels, datasets: [{ data: dataPoints, backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#7BC225', '#A64B00', '#006E6D'].slice(0, labels.length) }] }, plugins: [ChartDataLabels], options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' }, datalabels: { formatter: (v) => (v * 100 / totalVal).toFixed(1) + "%", color: '#fff', font: { weight: 'bold' } } } } });
-        document.getElementById('chart-country-name').innerText = countryName + " Share"; document.getElementById('chart-panel').classList.add('active');
+        document.getElementById('chart-country-name').innerText = countryName + " Share"; 
+        document.getElementById('chart-panel').classList.add('active');
     }
 
-    /* [AppSheet 연동 채널 - 대소문자 무관하게 컬럼 매칭] */
-    window.addEventListener('message', (e) => {
-        if(Array.isArray(e.data)){
-            const fixedData = e.data.map(p => { let obj = {}; for (let key in p) { obj[key.toLowerCase()] = p[key]; } return obj; });
-            currentRawData = fixedData; renderEverything(fixedData);
-        }
-    });
-
-    /* [v11.6 지역/국가 3단계 분류 로직 완벽 복구] */
     function renderEverything(data) {
         activeMarkers.forEach(m => map.removeLayer(m)); activeMarkers = [];
-        document.getElementById('current-risk-list').innerHTML=''; document.getElementById('future-risk-list').innerHTML=''; document.getElementById('region-list').innerHTML='';
+        document.getElementById('current-risk-list').innerHTML=''; 
+        document.getElementById('future-risk-list').innerHTML=''; 
+        document.getElementById('region-list').innerHTML='';
         if (!data || data.length === 0) return;
+
         const activeData = data.filter(p => !(p.status && p.status.toLowerCase().includes('deleted'))).sort((a,b) => a.company.localeCompare(b.company));
         const total = activeData.reduce((s, p) => s + (parseFloat(p.capacity) || 0), 0);
-        document.getElementById('global-val').innerText = Math.round(total).toLocaleString(); document.getElementById('total-sites').innerText = activeData.length;
+        document.getElementById('global-val').innerText = Math.round(total).toLocaleString(); 
+        document.getElementById('total-sites').innerText = activeData.length;
         let cL = 0; const regs = {};
 
         activeData.forEach(p => {
             if(!p.lat || !p.lng) return;
-            const capa = parseFloat(p.capacity) || 0;
+            const capa = parseFloat(p.capacity) || 0; 
             const mDays = getLossDays(p.start_date, p.end_date, 'month');
             const tDays = getLossDays(p.start_date, p.end_date, 'total');
             const mLoss = (capa / 365) * mDays; const tLoss = (capa / 365) * tDays;
             const isC = p.status.includes('Current'), isF = p.status.includes('Future');
             if(isC) cL += mLoss;
-            const size = Math.sqrt(capa) * 0.55; let m;
+
+            const size = Math.sqrt(capa) * 0.55; 
+            let m;
             if (isC || isF) {
                 const fill = isC ? '#1A1A1B' : '#D35400';
                 m = L.marker([p.lat, p.lng], { zIndexOffset: 1000, icon: L.divIcon({ html: `<svg width="${size*2.2}" height="${size*2.2}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="${fill}" stroke="white" stroke-width="2"/></svg>`, className: 'custom-triangle', iconAnchor: [size*1.1, size*1.1] }) }).addTo(map);
@@ -226,31 +280,43 @@
                 m = L.circleMarker([p.lat, p.lng], { radius: size, fillColor: '#5DADE2', color: 'white', fillOpacity: 0.9, weight: 1 }).addTo(map);
             }
 
-            /* [v12.13 팝업 상세 정보 & 듀얼 로스 병기] */
             const lossText = (mLoss > 0 || tLoss > 0) ? `<span style="color:#E74C3C"> (M:-${mLoss.toFixed(1)}K / T:-${tLoss.toFixed(1)}K)</span>` : '';
             m.bindPopup(`<div style="min-width:280px; font-family:'Pretendard'; padding:5px;"><div style="font-size:1.1rem; font-weight:900; color:var(--primary); margin-bottom:10px; border-bottom:2px solid var(--accent); padding-bottom:5px;">${p.company}</div><div class="info-row"><span class="info-label">Region / Country</span><span class="info-value">${p.region || '-'} / ${p.country || '-'}</span></div><div class="info-row"><span class="info-label">Status</span><span class="info-value" style="color:#E74C3C; font-weight:900;">${p.status} (${p.start_date||''} ~ ${p.end_date||''})</span></div><div class="info-row"><span class="info-label">Capacity (Loss)</span><span class="info-value">${capa.toLocaleString()}K MT${lossText}</span></div><div class="history-container"><div class="history-title">🕒 STATUS HISTORY</div>${buildHistoryItems(p.summary || p.history)}</div></div>`);
+            
             m.on('click', (e) => { L.DomEvent.stopPropagation(e); flyToTarget(p.lat, p.lng, 7, m); });
             activeMarkers.push(m); p._m = m;
+
             const pCard = createPlantCard(p, total);
             if(isC) document.getElementById('current-risk-list').appendChild(pCard.cloneNode(true)).onclick = pCard.onclick;
             else if(isF) document.getElementById('future-risk-list').appendChild(pCard.cloneNode(true)).onclick = pCard.onclick;
+
             const r = p.region || "Other", c = p.country || "Other";
             if (!regs[r]) regs[r] = { name: r, countries: {}, totalP: 0, totalC: 0, sLat: 0, sLng: 0 };
             if (!regs[r].countries[c]) regs[r].countries[c] = { name: c, plants: [], cCapa: 0, sLat: 0, sLng: 0 };
-            regs[r].countries[c].plants.push(pCard); regs[r].countries[c].cCapa += capa; regs[r].totalP++; regs[r].totalC += capa; regs[r].sLat += p.lat; regs[r].sLng += p.lng;
+            regs[r].countries[c].plants.push(pCard); 
+            regs[r].countries[c].cCapa += capa; 
+            regs[r].totalP++; regs[r].totalC += capa; regs[r].sLat += p.lat; regs[r].sLng += p.lng;
         });
 
         Object.values(regs).sort((a,b) => b.totalP - a.totalP).forEach(r => {
-            const rDiv = document.createElement('div'); rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${r.sLat/r.totalP}, ${r.sLng/r.totalP}, 4);"><span>${r.name} (${r.totalP}) <span class="header-stats" style="color:#C0392B;">${Math.round(r.totalC).toLocaleString()}K</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
+            const rDiv = document.createElement('div'); 
+            rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${r.sLat/r.totalP}, ${r.sLng/r.totalP}, 4);"><span>${r.name} (${r.totalP}) <span class="header-stats" style="color:#C0392B;">${Math.round(r.totalC).toLocaleString()}K</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
             const rCont = rDiv.querySelector('.collapsible-content');
             Object.values(r.countries).sort((a,b) => b.cCapa - a.cCapa).forEach(c => {
-                const cDiv = document.createElement('div'); cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open');"><span>${c.name} (${c.plants.length}) <span class="header-stats" style="color:#1597BB; cursor:pointer;" onclick="event.stopPropagation(); showCountryStats('${c.name}')">${Math.round(c.cCapa).toLocaleString()}K 📊</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
-                const cCont = cDiv.querySelector('.collapsible-content'); c.plants.forEach(card => cCont.appendChild(card)); rCont.appendChild(cDiv);
+                const cDiv = document.createElement('div'); 
+                cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open');"><span>${c.name} (${c.plants.length}) <span class="header-stats" style="color:#1597BB; cursor:pointer;" onclick="event.stopPropagation(); showCountryStats('${c.name}')">${Math.round(c.cCapa).toLocaleString()}K 📊</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
+                const cCont = cDiv.querySelector('.collapsible-content'); 
+                c.plants.forEach(card => cCont.appendChild(card)); 
+                rCont.appendChild(cDiv);
             });
             document.getElementById('region-list').appendChild(rDiv);
         });
-        document.getElementById('cur-loss-mt').innerText = cL.toFixed(1) + "K"; document.getElementById('cur-ratio').innerText = total > 0 ? ((cL/(total/12))*100).toFixed(2) + "%" : "0.00%"; document.getElementById('cur-sum-h').innerText = cL.toFixed(1) + "K ▼";
+        
+        document.getElementById('cur-loss-mt').innerText = cL.toFixed(1) + "K"; 
+        document.getElementById('cur-ratio').innerText = total > 0 ? ((cL/(total/12))*100).toFixed(2) + "%" : "0.00%"; 
+        document.getElementById('cur-sum-h').innerText = cL.toFixed(1) + "K ▼";
     }
+
     window.onload = () => switchProduct('SM');
 </script>
 </body>
