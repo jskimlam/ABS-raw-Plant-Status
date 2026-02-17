@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v13.7)</title>
+    <title>Global Supply Control Tower | JS KIM (v13.8)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
@@ -20,18 +20,18 @@
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Pretendard', sans-serif; overflow: hidden; }
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
         #map { flex-grow: 1; height: 100%; background: #0b192e; z-index: 1; }
-        #sidebar { position: absolute; left: 0; top: 0; width: 360px; height: 100%; background: white; z-index: 2000; transition: transform 0.4s ease; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+        #sidebar { position: absolute; left: 0; top: 0; width: 320px; height: 100%; background: white; z-index: 2000; transition: transform 0.4s ease; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
         #sidebar.hidden { transform: translateX(-100%); }
         #toggle-btn { position: absolute; right: -45px; top: 20px; width: 45px; height: 45px; background: var(--primary); color: white; border: none; cursor: pointer; border-radius: 0 8px 8px 0; font-size: 18px; z-index: 2001; }
         .header { background: var(--primary); color: white; padding: 25px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); position: relative; }
-        .created-by { font-size: 1.3rem; color: #FFD700; font-weight: 900; display: block; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); margin-bottom: 15px; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 5px; }
+        .created-by { font-size: 1.1rem; color: #FFD700; font-weight: 900; display: block; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); margin-bottom: 15px; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 5px; }
         #data-mode { position: absolute; right: 20px; bottom: 20px; font-size: 0.65rem; font-weight: 900; padding: 4px 10px; border-radius: 12px; background: #95a5a6; color: white; cursor: pointer; z-index: 2002; }
         .product-tabs { display: flex; background: #051937; padding: 5px; gap: 4px; }
         .tab-btn { flex: 1; padding: 12px 2px; border: none; background: rgba(255,255,255,0.1); color: white; cursor: pointer; font-weight: bold; font-size: 0.75rem; border-radius: 4px; }
         .tab-btn.active { background: var(--accent); color: white; }
         .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; background: var(--accent); color: white; gap: 1px; }
-        .metric-box { padding: 12px; background: var(--accent); text-align: center; }
-        .metric-value { font-size: 1.25rem; font-weight: 900; }
+        .metric-box { padding: 10px; background: var(--accent); text-align: center; }
+        .metric-value { font-size: 1.15rem; font-weight: 900; }
         #list-container { flex-grow: 1; overflow-y: auto; background: var(--bg); }
         .group-header { padding: 14px 12px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.85rem; align-items: center; }
         .region-header { background: #cbdceb; color: var(--primary); margin-top: 2px; }
@@ -73,7 +73,7 @@
         <button style="background:var(--primary); color:white; padding:12px; width:100%; border:none; border-radius:8px; cursor:pointer; font-weight:900;" onclick="verifyAdmin()">인증</button>
     </div>
     <div id="data-input-section">
-        <textarea id="csv-input" placeholder="데이터를 붙여넣으세요..."></textarea>
+        <textarea id="csv-input" placeholder="CSV 데이터를 붙여넣으세요..."></textarea>
         <div style="display: flex; gap: 10px;">
             <button style="flex: 2; background:#27ae60; color:white; padding:15px; border:none; border-radius:10px; cursor:pointer; font-weight:900;" onclick="saveManualData()">저장</button>
             <button style="flex: 1; background:#e67e22; color:white; padding:15px; border:none; border-radius:10px; cursor:pointer; font-weight:900;" onclick="clearManualData()">초기화</button>
@@ -163,7 +163,7 @@
                 else if(h.includes('lng') || h.includes('long')) obj['lng'] = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0;
                 else if(h.includes('start')) obj['start_date'] = v;
                 else if(h.includes('end')) obj['end_date'] = v;
-                else if(h.includes('status') || h.includes('remark')) obj['status'] = v;
+                else if(h.includes('status') || h.includes('remark') || h.includes('rmk')) obj['status'] = v;
                 else obj[h] = v;
             });
             if(!obj.company) obj.company = obj.site || obj.plant || "Unknown";
@@ -172,19 +172,24 @@
     }
 
     function flyToTarget(lat, lng, zoom, marker = null) {
-        const sidebarWidth = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360;
+        const sidebarWidth = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 320;
         const targetPoint = map.project([lat, lng], zoom).subtract([sidebarWidth / 2, 0]);
         map.flyTo(map.unproject(targetPoint, zoom), zoom, { duration: 1.5 });
         if(marker) map.once('moveend', () => marker.openPopup());
     }
 
+    function cleanDateStr(dStr) {
+        if(!dStr) return "";
+        return dStr.replace(/\./g, '-').replace(/\//g, '-').trim();
+    }
+
     function getLossDays(startStr, endStr, mode, isCurrent = false) {
         if (!startStr || startStr === "") return 0;
         
-        const s = startStr.replace(/\./g, '-').replace(/\//g, '-').trim();
-        let e = endStr ? endStr.replace(/\./g, '-').replace(/\//g, '-').trim() : "";
+        const s = cleanDateStr(startStr);
+        let e = cleanDateStr(endStr);
 
-        // 핵심 수정: 종료일이 없는데 Current 리스크라면 이번 달 말일(2026-02-28)로 강제 설정
+        // 핵심: 종료일이 없는데 Current 리스크라면 이번 달 말일(2026-02-28)로 강제 설정
         if ((!e || e === "") && isCurrent) {
             e = "2026-02-28";
         } else if (!e || e === "") {
@@ -198,6 +203,7 @@
         const now = new Date(2026, 1, 17); 
         const mS = new Date(now.getFullYear(), now.getMonth(), 1);
         const mE = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        
         const iS = new Date(Math.max(mS, pS)); 
         const iE = new Date(Math.min(mE, pE));
         
@@ -303,9 +309,10 @@
             const capa = parseFloat(p.capacity) || 0;
             const statusStr = (p.status || "").toString().trim();
             const statusLower = statusStr.toLowerCase();
-            const isC = statusLower.includes('current');
-            const isF = statusLower.includes('future');
+            const isC = statusLower.includes('current') || statusLower.includes('trouble');
+            const isF = statusLower.includes('future') || statusLower.includes('maintenance');
             
+            // 종료일 부재 시 isC 기반으로 2월 말일까지 계산
             const mDays = getLossDays(p.start_date, p.end_date, 'month', isC);
             const tDays = getLossDays(p.start_date, p.end_date, 'total', isC);
             const mLoss = (capa / 365) * mDays; 
@@ -313,16 +320,17 @@
            
             if(isC) totalCurrentLoss += mLoss;
 
-            const markerSize = Math.sqrt(capa) * 0.55;
+            // 마커 크기 50% 축소 (sqrt * 0.4)
+            const markerSize = Math.sqrt(capa) * 0.4;
             let m;
             if (isC || isF) {
                 const markerColor = isC ? '#1A1A1B' : '#D35400';
                 m = L.marker([p.lat, p.lng], { 
                     zIndexOffset: 1000, 
                     icon: L.divIcon({ 
-                        html: `<svg width="${markerSize*2.2}" height="${markerSize*2.2}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="${markerColor}" stroke="white" stroke-width="2"/></svg>`, 
+                        html: `<svg width="${markerSize*2.5}" height="${markerSize*2.5}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="${markerColor}" stroke="white" stroke-width="2"/></svg>`, 
                         className: 'custom-triangle', 
-                        iconAnchor: [markerSize*1.1, markerSize*1.1] 
+                        iconAnchor: [markerSize*1.25, markerSize*1.25] 
                     }) 
                 }).addTo(map);
             } else {
