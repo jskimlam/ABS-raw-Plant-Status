@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v13.2)</title>
+    <title>Global Supply Control Tower | JS KIM (v13.3)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
@@ -10,7 +10,6 @@
     <script src="data/data_an.js"></script>
     <script src="data/data_bd.js"></script>
     <style>
-        [cite_start]/* [cite: 2, 3] */
         :root { 
             --primary: #0A2647; 
             --accent: #1597BB; 
@@ -130,7 +129,6 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     const ADMIN_PASS = "jskim0111"; 
-    [cite_start]// [cite: 74] 제품별 시트 주소 (GID 확인 필요)
     const SHEET_URLS = { 
         'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv',
         'AN': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=1510125433&single=true&output=csv',
@@ -141,12 +139,10 @@
     layers.Standard.addTo(map); L.control.layers(layers).addTo(map);
     let currentProd = 'SM', activeMarkers = [], currentRawData = [], currentTheme = 'light', countryChart = null;
 
-    map.on('baselayerchange', (e) => { currentTheme = (e.name === "Dark") ? 'dark' : 'light'; if (currentRawData.length > 0) renderEverything(currentRawData); });
+    map.on('baselayerchange', (e) => { currentTheme = (e.name === "Dark") ? 'dark' : 'light'; renderEverything(currentRawData); });
     function showUpdateModal() { document.getElementById('admin-password').value = ""; document.getElementById('auth-section').style.display = 'block'; document.getElementById('data-input-section').style.display = 'none'; document.getElementById('update-modal').style.display = 'block'; }
     function closeModal() { document.getElementById('update-modal').style.display = 'none'; }
     function verifyAdmin() { if (document.getElementById('admin-password').value === ADMIN_PASS) { document.getElementById('auth-section').style.display = 'none'; document.getElementById('data-input-section').style.display = 'block'; } else { alert("암호 불일치."); } }
-    function clearManualData() { if(confirm("메모리를 초기화하시겠습니까?")) { localStorage.removeItem(`MANUAL_DATA_${currentProd}`); location.reload(); } }
-    function saveManualData() { const input = document.getElementById('csv-input').value; const parsed = parseUniversal(input); if(parsed.length > 0) { localStorage.setItem(`MANUAL_DATA_${currentProd}`, JSON.stringify(parsed)); alert("저장 완료."); closeModal(); renderEverything(parsed); } }
     
     function parseUniversal(text) { 
         const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0); 
@@ -154,8 +150,7 @@
         const del = lines[0].includes('\t') ? '\t' : ','; 
         const heads = lines[0].split(del).map(h => h.trim().toLowerCase()); 
         return lines.slice(1).map(line => { 
-            const vals = line.split(del); 
-            let obj = {}; 
+            const vals = line.split(del); let obj = {}; 
             heads.forEach((h, i) => { 
                 let v = vals[i] ? vals[i].trim() : ""; 
                 if (["capacity", "lat", "lng"].includes(h)) v = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0; 
@@ -171,17 +166,13 @@
         map.flyTo(map.unproject(pt, zoom), zoom, { duration: 1.5 }); 
         if(marker) map.once('moveend', () => marker.openPopup()); 
     }
-    
-    function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
-    function closeChartPanel() { document.getElementById('chart-panel').classList.remove('active'); }
 
-    [cite_start]// [cite: 91, 92, 93, 94, 95, 96] 고정밀 로스 계산기
     function getLossDays(startStr, endStr, mode) {
         if (!startStr || !endStr) return 0;
         const pS = new Date(startStr); const pE = new Date(endStr);
         if (isNaN(pS) || isNaN(pE)) return 0;
         if (mode === 'total') return Math.max(0, Math.floor((pE - pS) / 86400000) + 1);
-        const now = new Date(); 
+        const now = new Date(); // 2026-02-17 기준
         const mS = new Date(now.getFullYear(), now.getMonth(), 1);
         const mE = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         const iS = new Date(Math.max(mS, pS)); const iE = new Date(Math.min(mE, pE));
@@ -203,67 +194,36 @@
         const mDays = getLossDays(p.start_date, p.end_date, 'month');
         const loss = ((capa / 365) * mDays).toFixed(1);
         const card = document.createElement('div'); card.className = 'plant-card';
-        card.innerHTML = `${(mDays>0)?`<span class="loss-badge">${loss}K</span>`:''}<b>${p.company}</b> <span style="color:#1597BB">(${((capa/totalCapa)*100).toFixed(1)}%)</span><div style="color:#666; font-size:0.65rem;">${capa}K | ${p.status}</div>`;
-        card.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); }; 
-        return card;
+        card.innerHTML = `${(mDays>0)?`<span class="loss-badge">${loss}K</span>`:''}<b>${p.company}</b> <span style="color:#1597BB">(${((capa/totalCapa)*100).toFixed(1)}%)</span><div style="color:#666; font-size:0.65rem;">${capa}K | ${p.status||'Normal'}</div>`;
+        card.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); }; return card;
     }
 
-    [cite_start]// [cite: 102, 103, 104, 105, 106] 제품 스위칭 및 온라인 연동 알림
     async function switchProduct(prod) {
         currentProd = prod; 
-        document.querySelectorAll('.tab-btn').forEach(b => {
-            b.classList.remove('active');
-            if(b.id === `btn-${prod}`) b.classList.add('active');
-        });
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.id === `btn-${prod}`));
         const ovl = document.getElementById('sync-overlay'); 
         ovl.style.display = 'flex'; ovl.style.opacity = '1';
+        document.getElementById('sync-main-text').innerText = "동기화 시도 중...";
         
         try {
             const res = await fetch(SHEET_URLS[prod] + "&t=" + new Date().getTime());
             if (res.ok) { 
-                const text = await res.text();
-                const data = parseUniversal(text); 
-                currentRawData = data; 
-                renderEverything(data); 
-                // 온라인 연동 성공 메시지 표시
+                currentRawData = parseUniversal(await res.text()); 
                 document.getElementById('sync-main-text').innerText = "온라인 연동 완료!";
                 document.getElementById('sync-main-text').style.color = "#FFD700";
-            } else {
-                throw new Error("Sync Fail");
-            }
+            } else { throw new Error(); }
         } catch(e) { 
-            console.log("Local Backup Mode for", prod);
-            let localData = [];
-            if(prod === 'SM') localData = typeof data_sm !== 'undefined' ? data_sm : [];
-            else if(prod === 'AN') localData = typeof data_an !== 'undefined' ? data_an : [];
-            else if(prod === 'BD') localData = typeof data_bd !== 'undefined' ? data_bd : [];
-            currentRawData = localData;
-            renderEverything(localData);
-            document.getElementById('sync-main-text').innerText = "오프라인 모드 로드";
-            document.getElementById('sync-main-text').style.color = "#ffffff";
+            console.log("Local Backup Mode");
+            if(prod === 'SM') currentRawData = typeof data_sm !== 'undefined' ? data_sm : [];
+            else if(prod === 'AN') currentRawData = typeof data_an !== 'undefined' ? data_an : [];
+            else if(prod === 'BD') currentRawData = typeof data_bd !== 'undefined' ? data_bd : [];
+            document.getElementById('sync-main-text').innerText = "로컬 데이터 로드됨";
         } finally {
-            setTimeout(() => { 
-                ovl.style.opacity = '0'; 
-                setTimeout(() => { 
-                    ovl.style.display = 'none'; 
-                    document.getElementById('sync-main-text').innerText = "동기화 시도 중...";
-                    document.getElementById('sync-main-text').style.color = "white";
-                }, 600); 
-            }, 1200);
+            renderEverything(currentRawData);
+            setTimeout(() => { ovl.style.opacity = '0'; setTimeout(() => { ovl.style.display = 'none'; }, 600); }, 1000);
         }
     }
 
-    function showCountryStats(countryName) {
-        const countryData = currentRawData.filter(p => p.country === countryName && !(p.status && p.status.toLowerCase().includes('deleted'))).sort((a,b) => b.capacity - a.capacity);
-        const labels = countryData.map(p => p.company), dataPoints = countryData.map(p => parseFloat(p.capacity) || 0), totalVal = dataPoints.reduce((a, b) => a + b, 0);
-        if (countryChart) countryChart.destroy();
-        const ctx = document.getElementById('country-chart').getContext('2d');
-        countryChart = new Chart(ctx, { type: 'pie', data: { labels: labels, datasets: [{ data: dataPoints, backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#7BC225', '#A64B00', '#006E6D'].slice(0, labels.length) }] }, plugins: [ChartDataLabels], options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' }, datalabels: { formatter: (v) => (v * 100 / totalVal).toFixed(1) + "%", color: '#fff', font: { weight: 'bold' } } } } });
-        document.getElementById('chart-country-name').innerText = countryName + " Share"; 
-        document.getElementById('chart-panel').classList.add('active');
-    }
-
-    [cite_start]// [cite: 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127] 렌더링 엔진
     function renderEverything(data) {
         activeMarkers.forEach(m => map.removeLayer(m)); activeMarkers = [];
         document.getElementById('current-risk-list').innerHTML=''; 
@@ -271,10 +231,11 @@
         document.getElementById('region-list').innerHTML='';
         if (!data || data.length === 0) return;
 
-        const activeData = data.filter(p => !(p.status && p.status.toLowerCase().includes('deleted'))).sort((a,b) => a.company.localeCompare(b.company));
+        const activeData = data.filter(p => !(p.status && p.status.toString().toLowerCase().includes('deleted'))).sort((a,b) => (a.company || "").toString().localeCompare((b.company || "").toString()));
         const total = activeData.reduce((s, p) => s + (parseFloat(p.capacity) || 0), 0);
         document.getElementById('global-val').innerText = Math.round(total).toLocaleString(); 
         document.getElementById('total-sites').innerText = activeData.length;
+        
         let cL = 0; const regs = {};
 
         activeData.forEach(p => {
@@ -284,8 +245,10 @@
             const tDays = getLossDays(p.start_date, p.end_date, 'total');
             const mLoss = (capa / 365) * mDays; const tLoss = (capa / 365) * tDays;
             
-            // Current Risk 로스 합산 로직 (SM/AN/BD 공통 적용)
-            const isC = p.status.includes('Current'), isF = p.status.includes('Future');
+            // 상태값 안전 확인 (v13.3 핵심 수정)
+            const statusStr = (p.status || "").toString();
+            const isC = statusStr.includes('Current');
+            const isF = statusStr.includes('Future');
             if(isC) cL += mLoss;
 
             const size = Math.sqrt(capa) * 0.55; 
@@ -298,7 +261,7 @@
             }
 
             const lossText = (mLoss > 0 || tLoss > 0) ? `<span style="color:#E74C3C"> (M:-${mLoss.toFixed(1)}K / T:-${tLoss.toFixed(1)}K)</span>` : '';
-            m.bindPopup(`<div style="min-width:280px; font-family:'Pretendard'; padding:5px;"><div style="font-size:1.1rem; font-weight:900; color:var(--primary); margin-bottom:10px; border-bottom:2px solid var(--accent); padding-bottom:5px;">${p.company}</div><div class="info-row"><span class="info-label">Region / Country</span><span class="info-value">${p.region || '-'} / ${p.country || '-'}</span></div><div class="info-row"><span class="info-label">Status</span><span class="info-value" style="color:#E74C3C; font-weight:900;">${p.status} (${p.start_date||''} ~ ${p.end_date||''})</span></div><div class="info-row"><span class="info-label">Capacity (Loss)</span><span class="info-value">${capa.toLocaleString()}K MT${lossText}</span></div><div class="history-container"><div class="history-title">🕒 STATUS HISTORY</div>${buildHistoryItems(p.summary || p.history || p.history_data)}</div></div>`);
+            m.bindPopup(`<div style="min-width:280px; font-family:'Pretendard'; padding:5px;"><div style="font-size:1.1rem; font-weight:900; color:var(--primary); margin-bottom:10px; border-bottom:2px solid var(--accent); padding-bottom:5px;">${p.company}</div><div class="info-row"><span class="info-label">Region / Country</span><span class="info-value">${p.region || '-'} / ${p.country || '-'}</span></div><div class="info-row"><span class="info-label">Status</span><span class="info-value" style="color:#E74C3C; font-weight:900;">${statusStr || 'Normal'} (${p.start_date||''} ~ ${p.end_date||''})</span></div><div class="info-row"><span class="info-label">Capacity (Loss)</span><span class="info-value">${capa.toLocaleString()}K MT${lossText}</span></div><div class="history-container"><div class="history-title">🕒 STATUS HISTORY</div>${buildHistoryItems(p.summary || p.history || p.history_data)}</div></div>`);
             
             m.on('click', (e) => { L.DomEvent.stopPropagation(e); flyToTarget(p.lat, p.lng, 7, m); });
             activeMarkers.push(m); p._m = m;
@@ -329,12 +292,13 @@
             document.getElementById('region-list').appendChild(rDiv);
         });
         
-        // 메트릭스 업데이트 (Month Loss, Cur Loss %)
         document.getElementById('cur-loss-mt').innerText = cL.toFixed(1) + "K"; 
         document.getElementById('cur-ratio').innerText = total > 0 ? ((cL/(total/12))*100).toFixed(2) + "%" : "0.00%"; 
         document.getElementById('cur-sum-h').innerText = cL.toFixed(1) + "K ▼";
     }
 
+    function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
+    function closeChartPanel() { document.getElementById('chart-panel').classList.remove('active'); }
     window.onload = () => switchProduct('SM');
 </script>
 </body>
