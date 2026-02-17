@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v13.3)</title>
+    <title>Global Supply Control Tower | JS KIM (v13.6)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
@@ -10,13 +10,8 @@
     <script src="data/data_an.js"></script>
     <script src="data/data_bd.js"></script>
     <style>
-        :root { 
-            --primary: #0A2647; 
-            --accent: #1597BB; 
-            --current: #1A1A1B; 
-            --future: #D35400; 
-            --bg: #F0F5F9; 
-        }
+        /* [v11.6 오리지널 디자인 100% 복구] */
+        :root { --primary: #0A2647; --accent: #1597BB; --current: #1A1A1B; --future: #D35400; --bg: #F0F5F9; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Pretendard', sans-serif; overflow: hidden; }
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
         #map { flex-grow: 1; height: 100%; background: #0b192e; z-index: 1; }
@@ -128,178 +123,182 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    const ADMIN_PASS = "jskim0111"; 
+    const ADMIN_PASS = "jskim0111"; [cite: 74]
     const SHEET_URLS = { 
         'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv',
         'AN': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=1510125433&single=true&output=csv',
         'BD': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=1819385078&single=true&output=csv'
-    };
-    const layers = { "Standard": L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'), "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'), "Dark": L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png') };
-    const map = L.map('map', {zoomControl: false, zoomAnimation: true}).setView([20, 100], 3);
-    layers.Standard.addTo(map); L.control.layers(layers).addTo(map);
-    let currentProd = 'SM', activeMarkers = [], currentRawData = [], currentTheme = 'light', countryChart = null;
+    }; [cite: 74]
+    const layers = { "Standard": L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'), "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'), "Dark": L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png') }; [cite: 75]
+    const map = L.map('map', {zoomControl: false, zoomAnimation: true}).setView([20, 100], 3); [cite: 75, 76]
+    layers.Standard.addTo(map); L.control.layers(layers).addTo(map); [cite: 76]
+    let currentProd = 'SM', activeMarkers = [], currentRawData = [], currentTheme = 'light', countryChart = null; [cite: 77]
 
-    map.on('baselayerchange', (e) => { currentTheme = (e.name === "Dark") ? 'dark' : 'light'; renderEverything(currentRawData); });
-    function showUpdateModal() { document.getElementById('admin-password').value = ""; document.getElementById('auth-section').style.display = 'block'; document.getElementById('data-input-section').style.display = 'none'; document.getElementById('update-modal').style.display = 'block'; }
-    function closeModal() { document.getElementById('update-modal').style.display = 'none'; }
-    function verifyAdmin() { if (document.getElementById('admin-password').value === ADMIN_PASS) { document.getElementById('auth-section').style.display = 'none'; document.getElementById('data-input-section').style.display = 'block'; } else { alert("암호 불일치."); } }
-    
-    function parseUniversal(text) { 
-        const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0); 
-        if(lines.length < 2) return []; 
-        const del = lines[0].includes('\t') ? '\t' : ','; 
-        const heads = lines[0].split(del).map(h => h.trim().toLowerCase()); 
-        return lines.slice(1).map(line => { 
-            const vals = line.split(del); let obj = {}; 
-            heads.forEach((h, i) => { 
-                let v = vals[i] ? vals[i].trim() : ""; 
-                if (["capacity", "lat", "lng"].includes(h)) v = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0; 
-                obj[h] = v; 
-            }); 
-            return obj; 
-        }); 
+    map.on('baselayerchange', (e) => { currentTheme = (e.name === "Dark") ? 'dark' : 'light'; renderEverything(currentRawData); }); [cite: 78]
+    function showUpdateModal() { document.getElementById('admin-password').value = ""; document.getElementById('auth-section').style.display = 'block'; document.getElementById('data-input-section').style.display = 'none'; document.getElementById('update-modal').style.display = 'block'; } [cite: 79]
+    function closeModal() { document.getElementById('update-modal').style.display = 'none'; } [cite: 80]
+    function verifyAdmin() { if (document.getElementById('admin-password').value === ADMIN_PASS) { document.getElementById('auth-section').style.display = 'none'; document.getElementById('data-input-section').style.display = 'block'; } else { alert("암호 불일치."); } } [cite: 81]
+
+    function parseUniversal(text) { [cite: 85]
+        const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0); [cite: 85]
+        if(lines.length < 2) return []; [cite: 85]
+        const del = lines[0].includes('\t') ? '\t' : ','; [cite: 86]
+        const heads = lines[0].split(del).map(h => h.trim().toLowerCase()); [cite: 86]
+        return lines.slice(1).map(line => { [cite: 87]
+            const vals = line.split(del); let obj = {}; [cite: 87]
+            heads.forEach((h, i) => { [cite: 87]
+                let v = vals[i] ? vals[i].trim() : ""; [cite: 87]
+                if (["capacity", "lat", "lng"].includes(h)) v = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0; [cite: 87]
+                obj[h] = v; [cite: 87]
+            }); [cite: 87]
+            return obj; [cite: 87]
+        }); [cite: 87]
     }
 
-    function flyToTarget(lat, lng, zoom, marker = null) { 
-        const off = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360; 
-        const pt = map.project([lat, lng], zoom).subtract([off / 2, 0]); 
-        map.flyTo(map.unproject(pt, zoom), zoom, { duration: 1.5 }); 
-        if(marker) map.once('moveend', () => marker.openPopup()); 
+    function flyToTarget(lat, lng, zoom, marker = null) { [cite: 88]
+        const off = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360; [cite: 88]
+        const pt = map.project([lat, lng], zoom).subtract([off / 2, 0]); [cite: 89]
+        map.flyTo(map.unproject(pt, zoom), zoom, { duration: 1.5 }); [cite: 89]
+        if(marker) map.once('moveend', () => marker.openPopup()); [cite: 89]
     }
 
-    function getLossDays(startStr, endStr, mode) {
-        if (!startStr || !endStr) return 0;
-        const pS = new Date(startStr); const pE = new Date(endStr);
-        if (isNaN(pS) || isNaN(pE)) return 0;
-        if (mode === 'total') return Math.max(0, Math.floor((pE - pS) / 86400000) + 1);
-        const now = new Date(); // 2026-02-17 기준
-        const mS = new Date(now.getFullYear(), now.getMonth(), 1);
-        const mE = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        const iS = new Date(Math.max(mS, pS)); const iE = new Date(Math.min(mE, pE));
-        return (iS > iE) ? 0 : Math.floor((iE - iS) / 86400000) + 1;
+    function getLossDays(startStr, endStr, mode) { [cite: 91]
+        if (!startStr || !endStr) return 0; [cite: 91]
+        const pS = new Date(startStr); const pE = new Date(endStr); [cite: 92]
+        if (isNaN(pS) || isNaN(pE)) return 0; [cite: 92]
+        if (mode === 'total') return Math.max(0, Math.floor((pE - pS) / 86400000) + 1); [cite: 93]
+        const now = new Date(); [cite: 93]
+        const mS = new Date(now.getFullYear(), now.getMonth(), 1); [cite: 94]
+        const mE = new Date(now.getFullYear(), now.getMonth() + 1, 0); [cite: 95]
+        const iS = new Date(Math.max(mS, pS)); const iE = new Date(Math.min(mE, pE)); [cite: 96]
+        return (iS > iE) ? 0 : Math.floor((iE - iS) / 86400000) + 1; [cite: 96]
     }
 
-    function buildHistoryItems(summaryStr) {
-        if (!summaryStr || summaryStr === "0") return '<tr><td colspan="4" style="text-align:center; color:#ccc; padding:10px;">기록이 없습니다.</td></tr>';
-        const rows = summaryStr.split('|').map(h => {
-            const parts = h.split(':'); if (parts[1] && parts[1].includes('1899')) return '';
-            const status = parts[0] || "-"; const isWarning = status.toLowerCase().includes('shutdown') || status.toLowerCase().includes('maintenance');
-            return `<tr><td><span class="status-tag" style="background:${isWarning?'#E74C3C':'#27ae60'}">${status}</span></td><td>${parts[1]||'-'}</td><td><b>${parts[2]||'0'}d</b></td><td>${parts[3]||'-'}</td></tr>`;
-        }).filter(r => r !== '').join('');
-        return rows ? `<table class="history-table"><thead><tr><th>상태</th><th>날짜</th><th>일수</th><th>주기</th></tr></thead><tbody>${rows}</tbody></table>` : '<tr><td>기록없음</td></tr>';
+    function buildHistoryItems(summaryStr) { [cite: 97]
+        if (!summaryStr || summaryStr === "0") return '<tr><td colspan="4" style="text-align:center; color:#ccc; padding:10px;">기록이 없습니다.</td></tr>'; [cite: 97]
+        const rows = summaryStr.split('|').map(h => { [cite: 98]
+            const parts = h.split(':'); if (parts[1] && parts[1].includes('1899')) return ''; [cite: 98]
+            const status = parts[0] || "-"; const isWarning = status.toLowerCase().includes('shutdown') || status.toLowerCase().includes('maintenance'); [cite: 98]
+            return `<tr><td><span class="status-tag" style="background:${isWarning?'#E74C3C':'#27ae60'}">${status}</span></td><td>${parts[1]||'-'}</td><td><b>${parts[2]||'0'}d</b></td><td>${parts[3]||'-'}</td></tr>`; [cite: 98]
+        }).filter(r => r !== '').join(''); [cite: 98]
+        return rows ? `<table class="history-table"><thead><tr><th>상태</th><th>날짜</th><th>일수</th><th>주기</th></tr></thead><tbody>${rows}</tbody></table>` : '<tr><td>기록없음</td></tr>'; [cite: 98]
     }
 
-    function createPlantCard(p, totalCapa) {
-        const capa = parseFloat(p.capacity) || 0; 
-        const mDays = getLossDays(p.start_date, p.end_date, 'month');
-        const loss = ((capa / 365) * mDays).toFixed(1);
-        const card = document.createElement('div'); card.className = 'plant-card';
-        card.innerHTML = `${(mDays>0)?`<span class="loss-badge">${loss}K</span>`:''}<b>${p.company}</b> <span style="color:#1597BB">(${((capa/totalCapa)*100).toFixed(1)}%)</span><div style="color:#666; font-size:0.65rem;">${capa}K | ${p.status||'Normal'}</div>`;
-        card.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); }; return card;
+    function createPlantCard(p, totalCapa) { [cite: 99]
+        const capa = parseFloat(p.capacity) || 0; [cite: 100]
+        const mDays = getLossDays(p.start_date, p.end_date, 'month'); [cite: 100]
+        const loss = ((capa / 365) * mDays).toFixed(1); [cite: 100]
+        const card = document.createElement('div'); card.className = 'plant-card'; [cite: 101]
+        card.innerHTML = `${(mDays>0)?`<span class="loss-badge">${loss}K</span>`:''}<b>${p.company}</b> <span style="color:#1597BB">(${((capa/totalCapa)*100).toFixed(1)}%)</span><div style="color:#666; font-size:0.65rem;">${capa}K | ${p.status||'Normal'}</div>`; [cite: 101]
+        card.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); }; return card; [cite: 101]
     }
 
-    async function switchProduct(prod) {
-        currentProd = prod; 
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.id === `btn-${prod}`));
-        const ovl = document.getElementById('sync-overlay'); 
-        ovl.style.display = 'flex'; ovl.style.opacity = '1';
-        document.getElementById('sync-main-text').innerText = "동기화 시도 중...";
-        
-        try {
-            const res = await fetch(SHEET_URLS[prod] + "&t=" + new Date().getTime());
-            if (res.ok) { 
-                currentRawData = parseUniversal(await res.text()); 
-                document.getElementById('sync-main-text').innerText = "온라인 연동 완료!";
-                document.getElementById('sync-main-text').style.color = "#FFD700";
-            } else { throw new Error(); }
-        } catch(e) { 
-            console.log("Local Backup Mode");
-            if(prod === 'SM') currentRawData = typeof data_sm !== 'undefined' ? data_sm : [];
-            else if(prod === 'AN') currentRawData = typeof data_an !== 'undefined' ? data_an : [];
-            else if(prod === 'BD') currentRawData = typeof data_bd !== 'undefined' ? data_bd : [];
-            document.getElementById('sync-main-text').innerText = "로컬 데이터 로드됨";
-        } finally {
-            renderEverything(currentRawData);
-            setTimeout(() => { ovl.style.opacity = '0'; setTimeout(() => { ovl.style.display = 'none'; }, 600); }, 1000);
+    async function switchProduct(prod) { [cite: 102]
+        currentProd = prod; [cite: 102]
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.id === `btn-${prod}`)); [cite: 103]
+        const ovl = document.getElementById('sync-overlay'); [cite: 103]
+        ovl.style.display = 'flex'; ovl.style.opacity = '1'; [cite: 103]
+        document.getElementById('sync-main-text').innerText = "동기화 시도 중..."; [cite: 103]
+
+        try { [cite: 104]
+            const res = await fetch(SHEET_URLS[prod] + "&t=" + new Date().getTime()); [cite: 104]
+            if (res.ok) { [cite: 105]
+                currentRawData = parseUniversal(await res.text()); [cite: 105]
+                document.getElementById('sync-main-text').innerText = `${prod} 연동 완료!`; [cite: 106]
+                document.getElementById('sync-main-text').style.color = "#FFD700"; [cite: 106]
+            } else { throw new Error(); } [cite: 107]
+        } catch(e) { [cite: 107]
+            console.log("Local Backup Mode"); [cite: 107]
+            if(prod === 'SM') currentRawData = typeof data_sm !== 'undefined' ? data_sm : []; [cite: 107]
+            else if(prod === 'AN') currentRawData = typeof data_an !== 'undefined' ? data_an : []; [cite: 107]
+            else if(prod === 'BD') currentRawData = typeof data_bd !== 'undefined' ? data_bd : []; [cite: 107]
+            document.getElementById('sync-main-text').innerText = "로컬 데이터 로드됨"; [cite: 107]
+        } finally { [cite: 108]
+            renderEverything(currentRawData); [cite: 108]
+            setTimeout(() => { ovl.style.opacity = '0'; setTimeout(() => { ovl.style.display = 'none'; }, 600); }, 1000); [cite: 106]
         }
     }
 
-    function renderEverything(data) {
-        activeMarkers.forEach(m => map.removeLayer(m)); activeMarkers = [];
-        document.getElementById('current-risk-list').innerHTML=''; 
-        document.getElementById('future-risk-list').innerHTML=''; 
-        document.getElementById('region-list').innerHTML='';
-        if (!data || data.length === 0) return;
+    function renderEverything(data) { 
+        activeMarkers.forEach(m => map.removeLayer(m)); activeMarkers = []; 
+        document.getElementById('current-risk-list').innerHTML=''; [cite: 113]
+        document.getElementById('future-risk-list').innerHTML=''; [cite: 113]
+        document.getElementById('region-list').innerHTML=''; [cite: 113]
+        if (!data || data.length === 0) return; [cite: 113]
 
-        const activeData = data.filter(p => !(p.status && p.status.toString().toLowerCase().includes('deleted'))).sort((a,b) => (a.company || "").toString().localeCompare((b.company || "").toString()));
-        const total = activeData.reduce((s, p) => s + (parseFloat(p.capacity) || 0), 0);
-        document.getElementById('global-val').innerText = Math.round(total).toLocaleString(); 
-        document.getElementById('total-sites').innerText = activeData.length;
-        
-        let cL = 0; const regs = {};
+        const activeData = data.filter(p => !(p.status && p.status.toString().toLowerCase().includes('deleted'))).sort((a,b) => (a.company || "").toString().localeCompare((b.company || "").toString())); [cite: 114]
+        const total = activeData.reduce((s, p) => s + (parseFloat(p.capacity) || 0), 0); [cite: 115]
+        document.getElementById('global-val').innerText = Math.round(total).toLocaleString(); [cite: 115]
+        document.getElementById('total-sites').innerText = activeData.length; [cite: 115]
 
-        activeData.forEach(p => {
-            if(!p.lat || !p.lng) return;
-            const capa = parseFloat(p.capacity) || 0; 
-            const mDays = getLossDays(p.start_date, p.end_date, 'month');
-            const tDays = getLossDays(p.start_date, p.end_date, 'total');
-            const mLoss = (capa / 365) * mDays; const tLoss = (capa / 365) * tDays;
-            
-            // 상태값 안전 확인 (v13.3 핵심 수정)
-            const statusStr = (p.status || "").toString();
-            const isC = statusStr.includes('Current');
-            const isF = statusStr.includes('Future');
-            if(isC) cL += mLoss;
+        let cL = 0; const regs = {}; [cite: 116]
 
-            const size = Math.sqrt(capa) * 0.55; 
-            let m;
-            if (isC || isF) {
-                const fill = isC ? '#1A1A1B' : '#D35400';
-                m = L.marker([p.lat, p.lng], { zIndexOffset: 1000, icon: L.divIcon({ html: `<svg width="${size*2.2}" height="${size*2.2}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="${fill}" stroke="white" stroke-width="2"/></svg>`, className: 'custom-triangle', iconAnchor: [size*1.1, size*1.1] }) }).addTo(map);
-            } else {
-                m = L.circleMarker([p.lat, p.lng], { radius: size, fillColor: '#5DADE2', color: 'white', fillOpacity: 0.9, weight: 1 }).addTo(map);
+        activeData.forEach(p => { [cite: 116]
+            if(!p.lat || !p.lng) return; [cite: 116]
+            const capa = parseFloat(p.capacity) || 0; [cite: 116]
+            const mDays = getLossDays(p.start_date, p.end_date, 'month'); [cite: 116]
+            const tDays = getLossDays(p.start_date, p.end_date, 'total'); [cite: 116]
+            const mLoss = (capa / 365) * mDays; const tLoss = (capa / 365) * tDays; [cite: 116]
+
+            const rawStatus = (p.status || "").toString(); [cite: 117]
+            const statusLower = rawStatus.toLowerCase(); [cite: 117]
+            const isC = statusLower.includes('current') || statusLower.includes('shutdown') || statusLower.includes('shut down') || (statusLower.includes('maint') && !statusLower.includes('future')); [cite: 117]
+            const isF = statusLower.includes('future'); [cite: 117]
+
+            if(isC) cL += mLoss; [cite: 117]
+
+            const size = Math.sqrt(capa) * 0.55; let m; [cite: 118]
+            if (isC || isF) { [cite: 118]
+                const fill = isC ? '#1A1A1B' : '#D35400'; [cite: 118]
+                m = L.marker([p.lat, p.lng], { zIndexOffset: 1000, icon: L.divIcon({ html: `<svg width="${size*2.2}" height="${size*2.2}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="${fill}" stroke="white" stroke-width="2"/></svg>`, className: 'custom-triangle', iconAnchor: [size*1.1, size*1.1] }) }).addTo(map); [cite: 118]
+            } else { [cite: 118]
+                m = L.circleMarker([p.lat, p.lng], { radius: size, fillColor: '#5DADE2', color: 'white', fillOpacity: 0.9, weight: 1 }).addTo(map); [cite: 118]
             }
 
-            const lossText = (mLoss > 0 || tLoss > 0) ? `<span style="color:#E74C3C"> (M:-${mLoss.toFixed(1)}K / T:-${tLoss.toFixed(1)}K)</span>` : '';
-            m.bindPopup(`<div style="min-width:280px; font-family:'Pretendard'; padding:5px;"><div style="font-size:1.1rem; font-weight:900; color:var(--primary); margin-bottom:10px; border-bottom:2px solid var(--accent); padding-bottom:5px;">${p.company}</div><div class="info-row"><span class="info-label">Region / Country</span><span class="info-value">${p.region || '-'} / ${p.country || '-'}</span></div><div class="info-row"><span class="info-label">Status</span><span class="info-value" style="color:#E74C3C; font-weight:900;">${statusStr || 'Normal'} (${p.start_date||''} ~ ${p.end_date||''})</span></div><div class="info-row"><span class="info-label">Capacity (Loss)</span><span class="info-value">${capa.toLocaleString()}K MT${lossText}</span></div><div class="history-container"><div class="history-title">🕒 STATUS HISTORY</div>${buildHistoryItems(p.summary || p.history || p.history_data)}</div></div>`);
-            
-            m.on('click', (e) => { L.DomEvent.stopPropagation(e); flyToTarget(p.lat, p.lng, 7, m); });
-            activeMarkers.push(m); p._m = m;
+            const lossText = (mLoss > 0 || tLoss > 0) ? `<span style="color:#E74C3C"> (M:-${mLoss.toFixed(1)}K / T:-${tLoss.toFixed(1)}K)</span>` : ''; [cite: 119]
+            m.bindPopup(`<div style="min-width:280px; font-family:'Pretendard'; padding:5px;"><div style="font-size:1.1rem; font-weight:900; color:var(--primary); margin-bottom:10px; border-bottom:2px solid var(--accent); padding-bottom:5px;">${p.company}</div><div class="info-row"><span class="info-label">Region / Country</span><span class="info-value">${p.region || '-'} / ${p.country || '-'}</span></div><div class="info-row"><span class="info-label">Status</span><span class="info-value" style="color:#E74C3C; font-weight:900;">${rawStatus || 'Normal'} (${p.start_date||''} ~ ${p.end_date||''})</span></div><div class="info-row"><span class="info-label">Capacity (Loss)</span><span class="info-value">${capa.toLocaleString()}K MT${lossText}</span></div><div class="history-container"><div class="history-title">🕒 STATUS HISTORY</div>${buildHistoryItems(p.summary || p.history || p.history_data)}</div></div>`); [cite: 120]
 
-            const pCard = createPlantCard(p, total);
-            if(isC) document.getElementById('current-risk-list').appendChild(pCard.cloneNode(true)).onclick = pCard.onclick;
-            else if(isF) document.getElementById('future-risk-list').appendChild(pCard.cloneNode(true)).onclick = pCard.onclick;
+            m.on('click', (e) => { L.DomEvent.stopPropagation(e); flyToTarget(p.lat, p.lng, 7, m); }); [cite: 120]
+            activeMarkers.push(m); p._m = m; [cite: 121]
 
-            const r = p.region || "Other", c = p.country || "Other";
-            if (!regs[r]) regs[r] = { name: r, countries: {}, totalP: 0, totalC: 0, sLat: 0, sLng: 0 };
-            if (!regs[r].countries[c]) regs[r].countries[c] = { name: c, plants: [], cCapa: 0, sLat: 0, sLng: 0 };
-            regs[r].countries[c].plants.push(pCard); 
-            regs[r].countries[c].cCapa += capa; 
-            regs[r].totalP++; regs[r].totalC += capa; regs[r].sLat += p.lat; regs[r].sLng += p.lng;
+            const pCard = createPlantCard(p, total); [cite: 121]
+            if(isC) document.getElementById('current-risk-list').appendChild(pCard.cloneNode(true)).onclick = pCard.onclick; [cite: 121]
+            else if(isF) document.getElementById('future-risk-list').appendChild(pCard.cloneNode(true)).onclick = pCard.onclick; [cite: 122]
+
+            const r = p.region || "Other", c = p.country || "Other"; [cite: 122]
+            if (!regs[r]) regs[r] = { name: r, countries: {}, totalP: 0, totalC: 0, sLat: 0, sLng: 0 }; [cite: 123]
+            if (!regs[r].countries[c]) regs[r].countries[c] = { name: c, plants: [], cCapa: 0, sLat: 0, sLng: 0 }; [cite: 124]
+            regs[r].countries[c].plants.push(pCard); regs[r].countries[c].cCapa += capa; [cite: 124]
+            regs[r].totalP++; regs[r].totalC += capa; regs[r].sLat += p.lat; regs[r].sLng += p.lng; [cite: 125]
         });
 
-        Object.values(regs).sort((a,b) => b.totalP - a.totalP).forEach(r => {
-            const rDiv = document.createElement('div'); 
-            rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${r.sLat/r.totalP}, ${r.sLng/r.totalP}, 4);"><span>${r.name} (${r.totalP}) <span class="header-stats" style="color:#C0392B;">${Math.round(r.totalC).toLocaleString()}K</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
-            const rCont = rDiv.querySelector('.collapsible-content');
-            Object.values(r.countries).sort((a,b) => b.cCapa - a.cCapa).forEach(c => {
-                const cDiv = document.createElement('div'); 
-                cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open');"><span>${c.name} (${c.plants.length}) <span class="header-stats" style="color:#1597BB; cursor:pointer;" onclick="event.stopPropagation(); showCountryStats('${c.name}')">${Math.round(c.cCapa).toLocaleString()}K 📊</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
-                const cCont = cDiv.querySelector('.collapsible-content'); 
-                c.plants.forEach(card => cCont.appendChild(card)); 
-                rCont.appendChild(cDiv);
-            });
-            document.getElementById('region-list').appendChild(rDiv);
+        Object.values(regs).sort((a,b) => b.totalP - a.totalP).forEach(r => { [cite: 125]
+            const rDiv = document.createElement('div'); rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${r.sLat/r.totalP}, ${r.sLng/r.totalP}, 4);"><span>${r.name} (${r.totalP}) <span class="header-stats" style="color:#C0392B;">${Math.round(r.totalC).toLocaleString()}K</span></span><span>▼</span></div><div class="collapsible-content"></div>`; [cite: 126]
+            const rCont = rDiv.querySelector('.collapsible-content'); [cite: 126]
+            Object.values(r.countries).sort((a,b) => b.cCapa - a.cCapa).forEach(c => { [cite: 126]
+                const cDiv = document.createElement('div'); cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open');"><span>${c.name} (${c.plants.length}) <span class="header-stats" style="color:#1597BB; cursor:pointer;" onclick="event.stopPropagation(); showCountryStats('${c.name}')">${Math.round(c.cCapa).toLocaleString()}K 📊</span></span><span>▼</span></div><div class="collapsible-content"></div>`; [cite: 126]
+                const cCont = cDiv.querySelector('.collapsible-content'); c.plants.forEach(card => cCont.appendChild(card)); rCont.appendChild(cDiv); [cite: 126]
+            }); [cite: 126]
+            document.getElementById('region-list').appendChild(rDiv); [cite: 126]
         });
-        
-        document.getElementById('cur-loss-mt').innerText = cL.toFixed(1) + "K"; 
-        document.getElementById('cur-ratio').innerText = total > 0 ? ((cL/(total/12))*100).toFixed(2) + "%" : "0.00%"; 
-        document.getElementById('cur-sum-h').innerText = cL.toFixed(1) + "K ▼";
+
+        document.getElementById('cur-loss-mt').innerText = cL.toFixed(1) + "K"; [cite: 127]
+        const monthlyTotal = total / 12; [cite: 128]
+        document.getElementById('cur-ratio').innerText = monthlyTotal > 0 ? ((cL/monthlyTotal)*100).toFixed(2) + "%" : "0.00%"; [cite: 128]
+        document.getElementById('cur-sum-h').innerText = cL.toFixed(1) + "K ▼"; [cite: 128]
     }
 
-    function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
-    function closeChartPanel() { document.getElementById('chart-panel').classList.remove('active'); }
-    window.onload = () => switchProduct('SM');
+    function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); } [cite: 90]
+    function closeChartPanel() { document.getElementById('chart-panel').classList.remove('active'); } [cite: 90]
+    function showCountryStats(countryName) { [cite: 109]
+        const countryData = currentRawData.filter(p => p.country === countryName && !(p.status && p.status.toLowerCase().includes('deleted'))).sort((a,b) => b.capacity - a.capacity); [cite: 109]
+        const labels = countryData.map(p => p.company), dataPoints = countryData.map(p => parseFloat(p.capacity) || 0), totalVal = dataPoints.reduce((a, b) => a + b, 0); [cite: 109]
+        if (countryChart) countryChart.destroy(); [cite: 110]
+        const ctx = document.getElementById('country-chart').getContext('2d'); [cite: 110]
+        countryChart = new Chart(ctx, { type: 'pie', data: { labels: labels, datasets: [{ data: dataPoints, backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#7BC225', '#A64B00', '#006E6D'].slice(0, labels.length) }] }, plugins: [ChartDataLabels], options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' }, datalabels: { formatter: (v) => (v * 100 / totalVal).toFixed(1) + "%", color: '#fff', font: { weight: 'bold' } } } } }); [cite: 110]
+        document.getElementById('chart-country-name').innerText = countryName + " Share"; document.getElementById('chart-panel').classList.add('active'); [cite: 110]
+    }
+    window.onload = () => switchProduct('SM'); [cite: 128]
 </script>
 </body>
 </html>
