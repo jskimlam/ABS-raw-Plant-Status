@@ -178,8 +178,8 @@
         
         if (mode === 'total') return Math.max(0, Math.floor((pE - pS) / 86400000) + 1);
         
-        // 기준일: 2026-02-17
-        const now = new Date(2026, 1, 17); 
+        // v13.3 핵심 수정: 기준 날짜 2026-02-17 고정 (시스템 날짜 아님)
+        const now = new Date('2026-02-17'); 
         const mS = new Date(now.getFullYear(), now.getMonth(), 1);
         const mE = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         const iS = new Date(Math.max(mS, pS)); 
@@ -193,7 +193,9 @@
         const rows = summaryStr.split('|').map(h => {
             const parts = h.split(':'); if (parts[1] && parts[1].includes('1899')) return '';
             const status = (parts[0] || "").trim();
-            const isWarning = status.toLowerCase().includes('shutdown') || status.toLowerCase().includes('maintenance') || status.toLowerCase().includes('current');
+            // 상태값 체크 대소문자 허용 수정
+            const statusLower = status.toLowerCase();
+            const isWarning = statusLower.includes('shutdown') || statusLower.includes('maintenance') || statusLower.includes('current');
             return `<tr><td><span class="status-tag" style="background:${isWarning?'#E74C3C':'#27ae60'}">${status}</span></td><td>${parts[1]||'-'}</td><td><b>${parts[2]||'0'}d</b></td><td>${parts[3]||'-'}</td></tr>`;
         }).filter(r => r !== '').join('');
         return rows ? `<table class="history-table"><thead><tr><th>상태</th><th>날짜</th><th>일수</th><th>주기</th></tr></thead><tbody>${rows}</tbody></table>` : '<tr><td>기록없음</td></tr>';
@@ -258,9 +260,11 @@
             const mLoss = (capa / 365) * mDays; 
             const tLoss = (capa / 365) * tDays;
            
-            const statusStr = (p.status || "").toString();
-            const isC = statusStr.includes('Current');
-            const isF = statusStr.includes('Future');
+            // 핵심 수정: 대소문자 무시 및 공백 제거로 AN/BD 상태값 인식률 향상
+            const statusStr = (p.status || "").toString().trim();
+            const statusLower = statusStr.toLowerCase();
+            const isC = statusLower.includes('current');
+            const isF = statusLower.includes('future');
             
             if(isC) totalCurrentLoss += mLoss;
 
@@ -318,7 +322,6 @@
             document.getElementById('region-list').appendChild(rDiv);
         });
        
-        // 대시보드 메트릭 최종 업데이트 (AN/BD 포함 전체)
         const avgMonthlyCapa = totalGlobalCapa / 12;
         document.getElementById('cur-loss-mt').innerText = totalCurrentLoss.toFixed(1) + "K";
         document.getElementById('cur-ratio').innerText = totalGlobalCapa > 0 ? ((totalCurrentLoss / avgMonthlyCapa) * 100).toFixed(2) + "%" : "0.00%";
