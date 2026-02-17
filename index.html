@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v13.3)</title>
+    <title>Global Supply Control Tower | JS KIM (v13.4)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
@@ -129,7 +129,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     const ADMIN_PASS = "jskim0111";
-    // 수정된 GID 반영 완료: AN(263516767), BD(607848019)
+    // 1. Google Sheets GID 설정
     const SHEET_URLS = {
         'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv',
         'AN': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=263516767&single=true&output=csv',
@@ -143,24 +143,33 @@
     const map = L.map('map', {zoomControl: false, zoomAnimation: true}).setView([20, 100], 3);
     layers.Standard.addTo(map); L.control.layers(layers).addTo(map);
     
-    let currentProd = 'SM', activeMarkers = [], currentRawData = [], currentTheme = 'light';
+    let currentProd = 'SM', activeMarkers = [], currentRawData = [], currentTheme = 'light', countryChart = null;
 
     function showUpdateModal() { document.getElementById('admin-password').value = ""; document.getElementById('auth-section').style.display = 'block'; document.getElementById('data-input-section').style.display = 'none'; document.getElementById('update-modal').style.display = 'block'; }
     function closeModal() { document.getElementById('update-modal').style.display = 'none'; }
     function verifyAdmin() { if (document.getElementById('admin-password').value === ADMIN_PASS) { document.getElementById('auth-section').style.display = 'none'; document.getElementById('data-input-section').style.display = 'block'; } else { alert("암호 불일치."); } }
    
+    // 2. 스마트 데이터 파싱 (헤더 공백 처리 강화)
     function parseUniversal(text) {
         const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
         if(lines.length < 2) return [];
         const del = lines[0].includes('\t') ? '\t' : ',';
-        const heads = lines[0].split(del).map(h => h.trim().toLowerCase());
+        // 헤더 전처리: 공백을 언더바로, 소문자로, 특수문자 제거
+        const heads = lines[0].split(del).map(h => h.trim().toLowerCase().replace(/\s+/g, '_').replace(/[().]/g, ''));
         return lines.slice(1).map(line => {
             const vals = line.split(del); let obj = {};
             heads.forEach((h, i) => {
                 let v = vals[i] ? vals[i].trim() : "";
-                if (["capacity", "lat", "lng"].includes(h)) v = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0;
-                obj[h] = v;
+                // 키워드 매핑으로 안전하게 데이터 가져오기
+                if(h.includes('capacity')) obj['capacity'] = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0;
+                else if(h.includes('lat')) obj['lat'] = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0;
+                else if(h.includes('lng') || h.includes('long')) obj['lng'] = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0;
+                else if(h.includes('start') && h.includes('date')) obj['start_date'] = v;
+                else if(h.includes('end') && h.includes('date')) obj['end_date'] = v;
+                else obj[h] = v;
             });
+            // 기본값 보정
+            if(!obj.company) obj.company = obj.site || obj.plant || "Unknown";
             return obj;
         });
     }
@@ -179,8 +188,8 @@
         
         if (mode === 'total') return Math.max(0, Math.floor((pE - pS) / 86400000) + 1);
         
-        // 2026-02-17 기준 고정
-        const now = new Date('2026-02-17'); 
+        // 기준 날짜: 2026-02-17
+        const now = new Date(2026, 1, 17); 
         const mS = new Date(now.getFullYear(), now.getMonth(), 1);
         const mE = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         const iS = new Date(Math.max(mS, pS)); 
@@ -208,6 +217,53 @@
         const card = document.createElement('div'); card.className = 'plant-card';
         card.innerHTML = `${(mDays>0)?`<span class="loss-badge">${loss}K</span>`:''}<b>${p.company}</b> <span style="color:#1597BB">(${((capa/totalCapa)*100).toFixed(1)}%)</span><div style="color:#666; font-size:0.65rem;">${capa}K | ${p.status||'Normal'}</div>`;
         card.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); }; return card;
+    }
+
+    // 3. 차트 표시 함수 복구 (파이 차트)
+    function showCountryStats(countryName) {
+        const countryData = currentRawData.filter(p => (p.country || "").trim() === countryName && !(p.status && p.status.toString().toLowerCase().includes('deleted')));
+        if (countryData.length === 0) return;
+
+        const totalCapa = countryData.reduce((s, p) => s + (parseFloat(p.capacity) || 0), 0);
+        const labels = countryData.map(p => p.company);
+        const data = countryData.map(p => parseFloat(p.capacity) || 0);
+
+        const ctx = document.getElementById('country-chart').getContext('2d');
+        if (countryChart) countryChart.destroy();
+
+        document.getElementById('chart-country-name').innerText = `${countryName} Market Share (Total: ${Math.round(totalCapa).toLocaleString()}K)`;
+        document.getElementById('chart-panel').classList.add('active');
+
+        countryChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: ['#0A2647', '#1597BB', '#2ECC71', '#F1C40F', '#E74C3C', '#9B59B6', '#34495E', '#95A5A6', '#D35400', '#BDC3C7'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    datalabels: {
+                        color: 'white',
+                        font: { weight: 'bold', size: 10 },
+                        formatter: (value, ctx) => {
+                            let sum = 0;
+                            let dataArr = ctx.chart.data.datasets[0].data;
+                            dataArr.map(data => { sum += data; });
+                            let percentage = (value * 100 / sum).toFixed(1) + "%";
+                            return percentage;
+                        }
+                    },
+                    legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } }
+                }
+            },
+            plugins: [ChartDataLabels]
+        });
     }
 
     async function switchProduct(prod) {
@@ -330,6 +386,9 @@
     function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
     function closeChartPanel() { document.getElementById('chart-panel').classList.remove('active'); }
     
+    // 글로벌(window) 스코프에 함수 등록 (HTML onclick 호출용)
+    window.showCountryStats = showCountryStats;
+
     window.onload = () => switchProduct('SM');
 </script>
 </body>
