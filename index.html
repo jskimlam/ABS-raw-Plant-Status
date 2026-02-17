@@ -143,22 +143,18 @@
     function closeChartPanel() { document.getElementById('chart-panel').classList.remove('active'); }
 
     /* [고정밀 듀얼 로스 계산 엔진 - NaN 방지] */
-function getLossDays(startStr, endStr, mode) {
-    if (!startStr) return 0;
-    const parse = (s) => {
-        if(!s) return null;
-        let cleaned = String(s).replace(/\./g, '-').replace(/-+$/, '').trim();
-        let d = new Date(cleaned); return isNaN(d) ? null : d;
-    };
-    const pS = parse(startStr); let pE = parse(endStr);
-    if (!pS) return 0; if (!pE) pE = new Date("2099-12-31");
-    if (mode === 'total') return Math.max(0, Math.floor((pE - pS) / 86400000) + 1);
-    const now = new Date();
-    const mS = new Date(now.getFullYear(), now.getMonth(), 1);
-    const mE = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const iS = new Date(Math.max(mS, pS)); const iE = new Date(Math.min(mE, pE));
-    return (iS > iE) ? 0 : Math.floor((iE - iS) / 86400000) + 1;
-}
+    function getLossDays(startStr, endStr, mode) {
+        if (!startStr || !endStr) return 0;
+        const pS = new Date(startStr); const pE = new Date(endStr);
+        if (isNaN(pS) || isNaN(pE)) return 0;
+        if (mode === 'total') return Math.max(0, Math.floor((pE - pS) / 86400000) + 1);
+        const now = new Date(); // 2026-02-17 기준
+        const mS = new Date(now.getFullYear(), now.getMonth(), 1);
+        const mE = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const iS = new Date(Math.max(mS, pS)); const iE = new Date(Math.min(mE, pE));
+        return (iS > iE) ? 0 : Math.floor((iE - iS) / 86400000) + 1;
+    }
+
     /* [히스토리 빌더 완벽 복구 - 1899 필터링 포함] */
     function buildHistoryItems(summaryStr) {
         if (!summaryStr || summaryStr === "0") return '<tr><td colspan="4" style="text-align:center; color:#ccc; padding:10px;">기록이 없습니다.</td></tr>';
@@ -219,18 +215,16 @@ function getLossDays(startStr, endStr, mode) {
             const capa = parseFloat(p.capacity) || 0;
             const mDays = getLossDays(p.start_date, p.end_date, 'month');
             const tDays = getLossDays(p.start_date, p.end_date, 'total');
-            const mLoss = (capa / 365) * getLossDays(p.start_date, p.end_date, 'month');
-            const tLoss = (capa / 365) * getLossDays(p.start_date, p.end_date, 'total');
-            const dualLoss = (tLoss > 0) ? `<span style="color:#E74C3C; font-weight:bold;"> (M:-${mLoss.toFixed(1)}K / Y:-${tLoss.toFixed(1)}K)</span>` : '';
-
-            marker.bindPopup(`
-                <div style="min-width:280px; font-family:'Pretendard'; padding:5px;">
-                     <div style="font-size:1.1rem; font-weight:900; color:var(--primary); margin-bottom:10px; border-bottom:2px solid var(--accent); padding-bottom:5px;">${p.company}</div>
-                     <div class="info-row"><span class="info-label">Region / Country</span><span class="info-value">${p.region||'-'} / ${p.country||'-'}</span></div>
-                     <div class="info-row"><span class="info-label">Status</span><span class="info-value" style="color:#E74C3C; font-weight:900;">${p.status} (${p.start_date||''} ~ ${p.end_date||''})</span></div>
-                     <div class="info-row"><span class="info-label">Capacity (Loss)</span><span class="info-value">${capa.toLocaleString()}K MT${dualLoss}</span></div>
-                     <div class="history-container"><div class="history-title">🕒 STATUS HISTORY</div><table class="history-table"><tbody>${buildHistoryTable(p.summary||p.history)}</tbody></table></div>
-                 </div>
+            const mLoss = (capa / 365) * mDays; const tLoss = (capa / 365) * tDays;
+            const isC = p.status.includes('Current'), isF = p.status.includes('Future');
+            if(isC) cL += mLoss;
+            const size = Math.sqrt(capa) * 0.55; let m;
+            if (isC || isF) {
+                const fill = isC ? '#1A1A1B' : '#D35400';
+                m = L.marker([p.lat, p.lng], { zIndexOffset: 1000, icon: L.divIcon({ html: `<svg width="${size*2.2}" height="${size*2.2}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="${fill}" stroke="white" stroke-width="2"/></svg>`, className: 'custom-triangle', iconAnchor: [size*1.1, size*1.1] }) }).addTo(map);
+            } else {
+                m = L.circleMarker([p.lat, p.lng], { radius: size, fillColor: '#5DADE2', color: 'white', fillOpacity: 0.9, weight: 1 }).addTo(map);
+            }
 
             /* [v12.13 팝업 상세 정보 & 듀얼 로스 병기] */
             const lossText = (mLoss > 0 || tLoss > 0) ? `<span style="color:#E74C3C"> (M:-${mLoss.toFixed(1)}K / T:-${tLoss.toFixed(1)}K)</span>` : '';
