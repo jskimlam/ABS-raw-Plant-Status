@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v13.10)</title>
+    <title>Global Supply Control Tower | JS KIM (v13.11)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
@@ -142,7 +142,7 @@
     function clearManualData() { if(confirm("메모리를 초기화하시겠습니까?")) { localStorage.removeItem(`MANUAL_DATA_${currentProd}`); location.reload(); } }
     function saveManualData() { const input = document.getElementById('csv-input').value; const parsed = parseUniversal(input); if(parsed.length > 0) { localStorage.setItem(`MANUAL_DATA_${currentProd}`, JSON.stringify(parsed)); alert("저장 완료."); closeModal(); renderEverything(parsed, currentProd); } }
     
-    // [v13.10] 콤마(,)가 포함된 CSV도 완벽하게 파싱하는 엔진 적용 (기존 스타일 유지)
+    // [v13.11] 콤마(,)가 포함된 CSV도 완벽하게 파싱하는 정규식 엔진 (스타일 유지)
     function parseCSV(text){ let rows=[],row=[],val="",q=0; for(let i=0;i<text.length;i++){ let c=text[i],n=text[i+1]; if(c==='"'){ if(q&&n==='"'){val+='"';i++}else{q=!q} }else if(c===','&&!q){ row.push(val);val="" }else if((c==='\r'||c==='\n')&&!q){ if(val||row.length)row.push(val); if(row.length)rows.push(row); row=[];val=""; if(c==='\r'&&n==='\n')i++ }else{val+=c} } if(val||row.length){row.push(val);rows.push(row)} return rows; }
 
     function parseUniversal(text) { 
@@ -159,7 +159,7 @@
                 else if (h==='enddate'||h==='end_date') obj['end_date'] = v;
                 else obj[h] = v;
             });
-            // [v13.10] AN/BD Period 파싱 로직 추가 (스타일 유지)
+            // [v13.11] AN/BD Period 파싱 로직 추가 (스타일 유지)
             if((!obj.start_date||!obj.end_date) && obj.period){
                 const parts = obj.period.split('~').map(s=>s.trim());
                 if(parts.length===2){ const y=new Date().getFullYear(); obj.start_date=parts[0]+' '+y; obj.end_date=parts[1]+' '+y; }
@@ -198,7 +198,7 @@
         const capa = parseFloat(p.capacity) || 0; const mDays = getLossDays(p.start_date, p.end_date, 'month');
         const loss = ((capa / 365) * mDays).toFixed(1);
         const card = document.createElement('div'); card.className = 'plant-card';
-        card.innerHTML = `${(mDays>0)?`<span class="loss-badge">${loss}K</span>`:''}<b>${p.company}</b> <span style="color:#1597BB">(${((capa/totalCapa)*100).toFixed(1)}%)</span><div style="color:#666; font-size:0.65rem;">${capa}K | ${p.status}</div>`;
+        card.innerHTML = `${(mDays>0)?`<span class="loss-badge">${loss}K</span>`:''}<b>${p.company}</b> <span style="color:#1597BB">(${((capa/totalCapa)*100).toFixed(1)}%)</span><div style="color:#666; font-size:0.65rem;">${capa}K | ${p.status||'Normal'}</div>`;
         card.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); }; return card;
     }
 
@@ -237,7 +237,7 @@
             const tDays = getLossDays(p.start_date, p.end_date, 'total');
             const mLoss = (capa / 365) * mDays; const tLoss = (capa / 365) * tDays;
             
-            // [v13.10 상태값 판별 로직 강화]
+            // [v13.11 상태값 판별 로직 강화]
             const st = (p.status||"").toLowerCase();
             const isC = st.includes('current') || st.includes('shut') || st.includes('stop') || st.includes('maint') && !st.includes('future');
             const isF = st.includes('future');
