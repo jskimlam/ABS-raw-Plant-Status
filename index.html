@@ -129,10 +129,11 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     const ADMIN_PASS = "jskim0111";
+    // 수정된 GID 반영 완료: AN(263516767), BD(607848019)
     const SHEET_URLS = {
         'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv',
-        'AN': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=1510125433&single=true&output=csv',
-        'BD': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=1819385078&single=true&output=csv'
+        'AN': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=263516767&single=true&output=csv',
+        'BD': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=607848019&single=true&output=csv'
     };
     const layers = { 
         "Standard": L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'), 
@@ -178,7 +179,7 @@
         
         if (mode === 'total') return Math.max(0, Math.floor((pE - pS) / 86400000) + 1);
         
-        // v13.3 핵심 수정: 기준 날짜 2026-02-17 고정 (시스템 날짜 아님)
+        // 2026-02-17 기준 고정
         const now = new Date('2026-02-17'); 
         const mS = new Date(now.getFullYear(), now.getMonth(), 1);
         const mE = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -193,7 +194,6 @@
         const rows = summaryStr.split('|').map(h => {
             const parts = h.split(':'); if (parts[1] && parts[1].includes('1899')) return '';
             const status = (parts[0] || "").trim();
-            // 상태값 체크 대소문자 허용 수정
             const statusLower = status.toLowerCase();
             const isWarning = statusLower.includes('shutdown') || statusLower.includes('maintenance') || statusLower.includes('current');
             return `<tr><td><span class="status-tag" style="background:${isWarning?'#E74C3C':'#27ae60'}">${status}</span></td><td>${parts[1]||'-'}</td><td><b>${parts[2]||'0'}d</b></td><td>${parts[3]||'-'}</td></tr>`;
@@ -260,7 +260,6 @@
             const mLoss = (capa / 365) * mDays; 
             const tLoss = (capa / 365) * tDays;
            
-            // 핵심 수정: 대소문자 무시 및 공백 제거로 AN/BD 상태값 인식률 향상
             const statusStr = (p.status || "").toString().trim();
             const statusLower = statusStr.toLowerCase();
             const isC = statusLower.includes('current');
