@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v13.6)</title>
+    <title>Global Supply Control Tower | JS KIM (v13.8)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
@@ -10,324 +10,69 @@
     <script src="data/data_an.js"></script>
     <script src="data/data_bd.js"></script>
     <style>
-        :root { 
-            --primary: #0A2647; 
-            --accent: #1597BB; 
-            --current: #1A1A1B; 
-            --future: #D35400; 
-            --bg: #F0F5F9; 
-        }
-        body, html { 
-            margin: 0; 
-            padding: 0; 
-            height: 100%; 
-            font-family: 'Pretendard', sans-serif; 
-            overflow: hidden; 
-        }
-        #layout { 
-            display: flex; 
-            height: 100vh; 
-            width: 100vw; 
-            position: relative; 
-        }
-        #map { 
-            flex-grow: 1; 
-            height: 100%; 
-            background: #0b192e; 
-            z-index: 1; 
-        }
-        #sidebar { 
-            position: absolute; 
-            left: 0; 
-            top: 0; 
-            width: 360px; 
-            height: 100%; 
-            background: white; 
-            z-index: 2000; 
-            transition: transform 0.4s ease; 
-            box-shadow: 5px 0 15px rgba(0,0,0,0.1); 
-            display: flex; 
-            flex-direction: column; 
-        }
+        /* [v13.0 오리지널 디자인 가이드 100% 사수] */
+        :root { --primary: #0A2647; --accent: #1597BB; --current: #1A1A1B; --future: #D35400; --bg: #F0F5F9; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Pretendard', sans-serif; overflow: hidden; }
+        #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
+        #map { flex-grow: 1; height: 100%; background: #0b192e; z-index: 1; }
+        #sidebar { position: absolute; left: 0; top: 0; width: 360px; height: 100%; background: white; z-index: 2000; transition: transform 0.4s ease; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
         #sidebar.hidden { transform: translateX(-100%); }
-        #toggle-btn { 
-            position: absolute; 
-            right: -45px; 
-            top: 20px; 
-            width: 45px; 
-            height: 45px; 
-            background: var(--primary); 
-            color: white; 
-            border: none; 
-            cursor: pointer; 
-            border-radius: 0 8px 8px 0; 
-            font-size: 18px; 
-            z-index: 2001; 
-        }
-        .header { 
-            background: var(--primary); 
-            color: white; 
-            padding: 25px 20px; 
-            border-bottom: 1px solid rgba(255,255,255,0.1); 
-            position: relative; 
-        }
-        .created-by { 
-            font-size: 1.3rem; 
-            color: #FFD700; 
-            font-weight: 900; 
-            display: block; 
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5); 
-            margin-bottom: 15px; 
-            border-bottom: 1px solid rgba(255,215,0,0.3); 
-            padding-bottom: 5px; 
-        }
-        #data-mode { 
-            position: absolute; 
-            right: 20px; 
-            bottom: 20px; 
-            font-size: 0.65rem; 
-            font-weight: 900; 
-            padding: 4px 10px; 
-            border-radius: 12px; 
-            background: #95a5a6; 
-            color: white; 
-            cursor: pointer; 
-            z-index: 2002; 
-        }
-        .product-tabs { 
-            display: flex; 
-            background: #051937; 
-            padding: 5px; 
-            gap: 4px; 
-        }
-        .tab-btn { 
-            flex: 1; 
-            padding: 12px 2px; 
-            border: none; 
-            background: rgba(255,255,255,0.1); 
-            color: white; 
-            cursor: pointer; 
-            font-weight: bold; 
-            font-size: 0.75rem; 
-            border-radius: 4px; 
-        }
-        .tab-btn.active { 
-            background: var(--accent); 
-            color: white; 
-        }
-        .metrics-grid { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            background: var(--accent); 
-            color: white; 
-            gap: 1px; 
-        }
-        .metric-box { 
-            padding: 12px; 
-            background: var(--accent); 
-            text-align: center; 
-        }
-        .metric-value { 
-            font-size: 1.25rem; 
-            font-weight: 900; 
-        }
-        #list-container { 
-            flex-grow: 1; 
-            overflow-y: auto; 
-            background: var(--bg); 
-        }
-        .group-header { 
-            padding: 14px 12px; 
-            font-weight: bold; 
-            cursor: pointer; 
-            display: flex; 
-            justify-content: space-between; 
-            border-bottom: 1px solid rgba(0,0,0,0.05); 
-            font-size: 0.85rem; 
-            align-items: center; 
-        }
-        .region-header { 
-            background: #cbdceb; 
-            color: var(--primary); 
-            margin-top: 2px; 
-        }
-        .country-header { 
-            background: #e8eff5; 
-            font-size: 0.78rem; 
-            padding-left: 20px; 
-            border-left: 3px solid var(--accent); 
-        }
-        .header-stats { 
-            font-weight: 900; 
-            display: block; 
-            margin-top: 4px; 
-            font-size: 0.85rem; 
-        }
+        #toggle-btn { position: absolute; right: -45px; top: 20px; width: 45px; height: 45px; background: var(--primary); color: white; border: none; cursor: pointer; border-radius: 0 8px 8px 0; font-size: 18px; z-index: 2001; }
+        .header { background: var(--primary); color: white; padding: 25px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); position: relative; }
+        .created-by { font-size: 1.3rem; color: #FFD700; font-weight: 900; display: block; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); margin-bottom: 15px; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 5px; }
+        #data-mode { position: absolute; right: 20px; bottom: 20px; font-size: 0.65rem; font-weight: 900; padding: 4px 10px; border-radius: 12px; background: #95a5a6; color: white; cursor: pointer; z-index: 2002; }
+        .product-tabs { display: flex; background: #051937; padding: 5px; gap: 4px; }
+        .tab-btn { flex: 1; padding: 12px 2px; border: none; background: rgba(255,255,255,0.1); color: white; cursor: pointer; font-weight: bold; font-size: 0.75rem; border-radius: 4px; }
+        .tab-btn.active { background: var(--accent); color: white; }
+        .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; background: var(--accent); color: white; gap: 1px; }
+        .metric-box { padding: 12px; background: var(--accent); text-align: center; }
+        .metric-value { font-size: 1.25rem; font-weight: 900; }
+        #list-container { flex-grow: 1; overflow-y: auto; background: var(--bg); }
+        .group-header { padding: 14px 12px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.85rem; align-items: center; }
+        .region-header { background: #cbdceb; color: var(--primary); margin-top: 2px; }
+        .country-header { background: #e8eff5; font-size: 0.78rem; padding-left: 20px; border-left: 3px solid var(--accent); }
+        .header-stats { font-weight: 900; display: block; margin-top: 4px; font-size: 0.85rem; }
         .collapsible-content { display: none; }
         .open > .collapsible-content { display: block; }
-        .plant-card { 
-            padding: 12px 15px 12px 30px; 
-            border-bottom: 1px solid #eee; 
-            cursor: pointer; 
-            font-size: 0.72rem; 
-            background: white; 
-            position: relative; 
-        }
-        .loss-badge { 
-            background: #E74C3C; 
-            color: white; 
-            font-weight: bold; 
-            padding: 2px 6px; 
-            border-radius: 10px; 
-            font-size: 0.6rem; 
-            position: absolute; 
-            right: 10px; 
-            top: 10px; 
-        }
-        #update-modal { 
-            position: fixed; 
-            top: 50%; 
-            left: 50%; 
-            transform: translate(-50%, -50%); 
-            width: 420px; 
-            background: white; 
-            z-index: 11000; 
-            padding: 25px; 
-            box-shadow: 0 0 60px rgba(0,0,0,0.6); 
-            border-radius: 20px; 
-            display: none; 
-        }
-        #admin-password { 
-            width: 100%; 
-            padding: 12px; 
-            margin-bottom: 15px; 
-            border: 2px solid var(--primary); 
-            border-radius: 8px; 
-            box-sizing: border-box; 
-            font-weight: bold; 
-            font-size: 1rem; 
-            text-align: center; 
-        }
-        #data-input-section { 
-            display: none; 
-            border-top: 2px dashed #eee; 
-            padding-top: 15px; 
-            margin-top: 10px; 
-        }
-        textarea { 
-            width: 100%; 
-            height: 180px; 
-            margin-bottom: 10px; 
-            font-size: 0.75rem; 
-            border: 1px solid #ddd; 
-            padding: 8px; 
-            box-sizing: border-box; 
-        }
-        #sync-overlay { 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            background: rgba(10, 38, 71, 0.97); 
-            z-index: 10000; 
-            display: none; 
-            flex-direction: column; 
-            justify-content: center; 
-            align-items: center; 
-            color: white; 
-            text-align: center; 
-        }
-        .sync-spinner { 
-            width: 45px; 
-            height: 45px; 
-            border: 4px solid rgba(255,255,255,0.2); 
-            border-top: 4px solid #FFD700; 
-            border-radius: 50%; 
-            animation: spin 0.8s linear infinite; 
-            margin-bottom: 20px; 
-        }
+        .plant-card { padding: 12px 15px 12px 30px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.72rem; background: white; position: relative; }
+        .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 2px 6px; border-radius: 10px; font-size: 0.6rem; position: absolute; right: 10px; top: 10px; }
+        #update-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 420px; background: white; z-index: 11000; padding: 25px; box-shadow: 0 0 60px rgba(0,0,0,0.6); border-radius: 20px; display: none; }
+        #admin-password { width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid var(--primary); border-radius: 8px; box-sizing: border-box; font-weight: bold; font-size: 1rem; text-align: center; }
+        #sync-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 38, 71, 0.97); z-index: 10000; display: none; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; }
+        .sync-spinner { width: 45px; height: 45px; border: 4px solid rgba(255,255,255,0.2); border-top: 4px solid #FFD700; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .history-container { 
-            margin-top: 12px; 
-            padding-top: 10px; 
-            border-top: 1px dashed var(--accent); 
-        }
-        .history-title { 
-            font-size: 0.75rem; 
-            font-weight: 900; 
-            color: var(--accent); 
-            margin-bottom: 8px; 
-            display: flex; 
-            align-items: center; 
-            gap: 5px; 
-        }
-        .history-table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            font-size: 0.68rem; 
-            text-align: left; 
-        }
-        .history-table th { color: #888; padding: 4px; border-bottom: 1px solid #eee; }
-        .history-table td { padding: 6px 4px; border-bottom: 1px solid #f9f9f9; }
-        .status-tag { 
-            padding: 2px 4px; 
-            border-radius: 4px; 
-            font-weight: bold; 
-            color: white; 
-            font-size: 0.6rem; 
-        }
-        .info-row { 
-            display: flex; 
-            flex-direction: column; 
-            margin-bottom: 8px; 
-            border-bottom: 1px solid #f0f0f0; 
-            padding-bottom: 4px; 
-        }
+        /* [v13.0 표준 팝업 스타일] */
+        .info-row { display: flex; flex-direction: column; margin-bottom: 8px; border-bottom: 1px solid #f0f0f0; padding-bottom: 4px; }
         .info-label { font-size: 0.65rem; color: #888; font-weight: bold; text-transform: uppercase; }
         .info-value { font-size: 0.9rem; color: #222; font-weight: 700; }
-        #chart-panel { 
-            position: fixed; 
-            bottom: 0; 
-            left: 0; 
-            width: 100%; 
-            background: white; 
-            border-radius: 20px 20px 0 0; 
-            box-shadow: 0 -5px 20px rgba(0,0,0,0.2); 
-            z-index: 3000; 
-            padding: 20px; 
-            box-sizing: border-box; 
-            transition: transform 0.3s ease-in-out; 
-            transform: translateY(100%); 
-            max-height: 50vh; 
-            overflow: hidden; 
-            display: flex; 
-            flex-direction: column; 
-        }
+        .history-container { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--accent); }
+        .history-title { font-size: 0.75rem; font-weight: 900; color: var(--accent); margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
+        .history-table { width: 100%; border-collapse: collapse; font-size: 0.68rem; text-align: left; }
+        .history-table th { color: #888; padding: 4px; border-bottom: 1px solid #eee; }
+        .history-table td { padding: 6px 4px; border-bottom: 1px solid #f9f9f9; }
+        .status-tag { padding: 2px 4px; border-radius: 4px; font-weight: bold; color: white; font-size: 0.6rem; }
+        #chart-panel { position: fixed; bottom: 0; left: 0; width: 100%; background: white; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.2); z-index: 3000; padding: 20px; box-sizing: border-box; transition: transform 0.3s ease-in-out; transform: translateY(100%); max-height: 50vh; overflow: hidden; display: flex; flex-direction: column; }
         #chart-panel.active { transform: translateY(0); }
     </style>
 </head>
 <body>
-
 <div id="update-modal">
     <div id="auth-section">
         <h3 style="margin-top:0; color:var(--primary);">🔒 JS KIM Security</h3>
         <input type="password" id="admin-password" placeholder="Admin Password">
         <button style="background:var(--primary); color:white; padding:12px; width:100%; border:none; border-radius:8px; cursor:pointer; font-weight:900;" onclick="verifyAdmin()">인증</button>
     </div>
-    <div id="data-input-section">
-        <textarea id="csv-input" placeholder="데이터를 붙여넣으세요..."></textarea>
+    <div id="data-input-section" style="display:none; border-top:2px dashed #eee; padding-top:15px; margin-top:10px;">
+        <textarea id="csv-input" style="width:100%; height:180px; margin-bottom:10px;" placeholder="데이터를 붙여넣으세요..."></textarea>
         <button style="width:100%; background:#27ae60; color:white; padding:15px; border:none; border-radius:10px; cursor:pointer; font-weight:900;" onclick="saveManualData()">저장</button>
     </div>
     <button style="width:100%; margin-top:15px; border:none; padding:10px; border-radius:8px; cursor:pointer;" onclick="document.getElementById('update-modal').style.display='none'">닫기</button>
 </div>
-
 <div id="sync-overlay">
     <div class="sync-spinner"></div>
-    <div style="font-size: 1.8rem; font-weight: 900; margin-bottom: 12px;">보안 동기화 완료</div>
+    <div style="font-size: 1.8rem; font-weight: 900; margin-bottom: 12px;">보안 동기화 및 엔진 점검 중...</div>
     <div style="color: #FFD700; font-weight: 900; font-size: 1.5rem;">CREATED BY JS KIM OF LAM</div>
 </div>
-
 <div id="layout">
     <div id="sidebar">
         <button id="toggle-btn" onclick="document.getElementById('sidebar').classList.toggle('hidden')">☰</button>
@@ -355,22 +100,17 @@
     </div>
     <div id="map"></div>
 </div>
-
 <div id="chart-panel">
-    <div style="display:flex; justify-content:space-between; margin-bottom:15px; padding:10px;">
-        <span id="chart-title" style="font-weight:900; color:var(--primary);">Country Share</span>
-        <button onclick="document.getElementById('chart-panel').classList.remove('active')" style="border:none; background:none; font-size:1.5rem; cursor:pointer;">×</button>
-    </div>
+    <div style="display:flex; justify-content:space-between; margin-bottom:15px; padding:10px;"><span id="chart-title" style="font-weight:900; color:var(--primary);">Country Capacity Share</span><button onclick="document.getElementById('chart-panel').classList.remove('active')" style="border:none; background:none; font-size:1.5rem; cursor:pointer;">×</button></div>
     <div style="flex-grow:1; position:relative;"><canvas id="country-chart"></canvas></div>
 </div>
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     const ADMIN_PASS = "jskim0111";
     const SHEET_URLS = { 'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv' };
     const map = L.map('map', {zoomControl: false, zoomAnimation: true}).setView([20, 100], 3);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
-    let currentProd = 'SM', activeMarkers = [], currentRawData = [], countryChart = null;
+    let activeMarkers = [], currentRawData = [], countryChart = null;
 
     function verifyAdmin() { if (document.getElementById('admin-password').value === ADMIN_PASS) { document.getElementById('auth-section').style.display = 'none'; document.getElementById('data-input-section').style.display = 'block'; } else { alert("암호 불일치."); } }
     function saveManualData() { const input = document.getElementById('csv-input').value; const lines = input.split('\n').filter(l => l.trim().length > 0); const del = lines[0].includes('\t') ? '\t' : ','; const heads = lines[0].split(del).map(h => h.trim().toLowerCase()); const data = lines.slice(1).map(line => { const vals = line.split(del); let obj = {}; heads.forEach((h, i) => { obj[h] = vals[i] ? vals[i].trim() : ""; }); return obj; }); localStorage.setItem('MANUAL_DATA', JSON.stringify(data)); alert("저장 완료."); renderEverything(data); document.getElementById('update-modal').style.display='none'; }
@@ -378,19 +118,18 @@
     function flyToTarget(lat, lng, zoom, marker = null) { const off = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360; const pt = map.project([lat, lng], zoom).subtract([off / 2, 0]); map.flyTo(map.unproject(pt, zoom), zoom, { duration: 1.5 }); if(marker) map.once('moveend', () => marker.openPopup()); }
     function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
 
-    /* [JS KIM 표준 엔진] 마침표 날짜(2026.01.01.) 완벽 인식 패치 */
+    /* [v13.8 초정밀 엔진] 마침표 날짜(2026.01.01.) 인식 및 로스 계산 패치 */
     function getLossDays(startStr, endStr, mode) {
         if (!startStr) return 0;
         const parse = (s) => {
             if(!s) return null;
-            // 마침표(.)를 하이픈(-)으로 바꾸고 끝 마침표까지 제거하여 인식
+            // 2026.01.01. 형태를 하이픈으로 표준화하여 앱시트 데이터 완벽 수용
             let cleaned = String(s).replace(/\./g, '-').replace(/-+$/, '').trim();
-            let d = new Date(cleaned);
-            return isNaN(d) ? null : d;
+            let d = new Date(cleaned); return isNaN(d) ? null : d;
         };
         const pS = parse(startStr); let pE = parse(endStr);
-        if (!pS) return 0;
-        if (!pE) pE = new Date("2099-12-31");
+        if (!pS) return 0; if (!pE) pE = new Date("2099-12-31"); // 종료일 없으면 무기한 셧다운
+
         if (mode === 'total') return Math.max(0, Math.floor((pE - pS) / 86400000) + 1);
         const now = new Date(); // 2026-02-17 기준
         const mS = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -400,20 +139,20 @@
     }
 
     function buildHistoryTable(summary) {
-        if (!summary || summary === "0") return '<tr><td colspan="4" style="text-align:center; color:#ccc;">기록 없음</td></tr>';
+        if (!summary || summary === "0") return '<tr><td colspan="4" style="text-align:center; color:#ccc; padding:10px;">기록 없음</td></tr>';
         const rows = summary.split('|').map(h => {
             const parts = h.split(':'); if (parts[1] && parts[1].includes('1899')) return '';
             const isWarn = parts[0].toLowerCase().includes('shutdown') || parts[0].toLowerCase().includes('maintenance');
             return `<tr><td><span class="status-tag" style="background:${isWarn?'#E74C3C':'#27ae60'}">${parts[0]}</span></td><td>${parts[1]||'-'}</td><td><b>${parts[2]||'0'}d</b></td><td>${parts[3]||'-'}</td></tr>`;
         }).filter(r => r !== '').join('');
-        return `<table class="history-table"><thead><tr><th>상태</th><th>날짜</th><th>일수</th><th>주기</th></tr></thead><tbody>${rows}</tbody></table>`;
+        return `<table class="history-table"><tbody>${rows}</tbody></table>`;
     }
 
     function createPlantCard(p, totalCapa) {
         const capa = parseFloat(p.capacity) || 0; const mDays = getLossDays(p.start_date, p.end_date, 'month');
-        const loss = ((capa / 365) * mDays).toFixed(1);
+        const mLoss = ((capa / 365) * mDays).toFixed(1);
         const card = document.createElement('div'); card.className = 'plant-card';
-        card.innerHTML = `${(mDays>0)?`<span class="loss-badge">${loss}K</span>`:''}<b>${p.company}</b> <span style="color:#1597BB">(${((capa/totalCapa)*100).toFixed(1)}%)</span><div style="color:#666; font-size:0.65rem;">${capa}K | ${p.status}</div>`;
+        card.innerHTML = `${(mDays>0)?`<span class="loss-badge">${mLoss}K</span>`:''}<b>${p.company}</b> <span style="color:#1597BB">(${((capa/totalCapa)*100).toFixed(1)}%)</span><div style="color:#666; font-size:0.65rem;">${capa}K | ${p.status}</div>`;
         card.onclick = (e) => { e.stopPropagation(); map.flyTo([p.lat, p.lng], 7); p._m.openPopup(); }; return card;
     }
 
@@ -430,16 +169,7 @@
         try { const res = await fetch(SHEET_URLS[prod] + "&t=" + new Date().getTime()); if(res.ok) { const data = parseUniversal(await res.text()); currentRawData=data; renderEverything(data); setTimeout(() => { ovl.style.opacity='0'; setTimeout(()=>ovl.style.display='none', 600); }, 1200); } } catch(e) { ovl.style.display='none'; }
     }
 
-    function showCountryStats(countryName) {
-        const countryData = currentRawData.filter(p => p.country === countryName && !(p.status && p.status.toLowerCase().includes('deleted'))).sort((a,b) => b.capacity - a.capacity);
-        const labels = countryData.map(p => p.company), dataPoints = countryData.map(p => parseFloat(p.capacity) || 0), totalVal = dataPoints.reduce((a, b) => a + b, 0);
-        if (countryChart) countryChart.destroy();
-        const ctx = document.getElementById('country-chart').getContext('2d');
-        countryChart = new Chart(ctx, { type: 'pie', data: { labels: labels, datasets: [{ data: dataPoints, backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#7BC225', '#A64B00', '#006E6D'].slice(0, labels.length) }] }, plugins: [ChartDataLabels], options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' }, datalabels: { formatter: (v) => (v * 100 / totalVal).toFixed(1) + "%", color: '#fff', font: { weight: 'bold' } } } } });
-        document.getElementById('chart-country-name').innerText = countryName + " Share"; document.getElementById('chart-panel').classList.add('active');
-    }
-
-    /* [메인 렌더링 엔진] 3단계 분류 및 M/Y 로스 분리 100% 복구 */
+    /* [메인 렌더링 엔진] 3단계 분류 리스트 및 팝업 듀얼 로스 완벽 사수 */
     function renderEverything(data) {
         activeMarkers.forEach(m => map.removeLayer(m)); activeMarkers = [];
         document.getElementById('current-risk-list').innerHTML=''; document.getElementById('region-list').innerHTML='';
