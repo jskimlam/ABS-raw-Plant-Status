@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v13.11)</title>
+    <title>Global Supply Control Tower | JS KIM (v13.3)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
@@ -10,8 +10,13 @@
     <script src="data/data_an.js"></script>
     <script src="data/data_bd.js"></script>
     <style>
-        /* [v11.6 오리지널 디자인 100% 복구] */
-        :root { --primary: #0A2647; --accent: #1597BB; --current: #1A1A1B; --future: #D35400; --bg: #F0F5F9; }
+        :root {
+            --primary: #0A2647;
+            --accent: #1597BB;
+            --current: #1A1A1B;
+            --future: #D35400;
+            --bg: #F0F5F9;
+        }
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Pretendard', sans-serif; overflow: hidden; }
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
         #map { flex-grow: 1; height: 100%; background: #0b192e; z-index: 1; }
@@ -123,63 +128,53 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    const ADMIN_PASS = "jskim0111"; // [v11.6 사장님 원형 유지]
-    const SHEET_URLS = { 
-        'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv', 
-        'AN': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=1510125433&single=true&output=csv', 
-        'BD': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=1819385078&single=true&output=csv' 
+    const ADMIN_PASS = "jskim0111";
+    const SHEET_URLS = {
+        'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv',
+        'AN': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=1510125433&single=true&output=csv',
+        'BD': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=1819385078&single=true&output=csv'
     };
     const layers = { "Standard": L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'), "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'), "Dark": L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png') };
     const map = L.map('map', {zoomControl: false, zoomAnimation: true}).setView([20, 100], 3);
     layers.Standard.addTo(map); L.control.layers(layers).addTo(map);
     let currentProd = 'SM', activeMarkers = [], currentRawData = [], currentTheme = 'light', countryChart = null;
 
-    /* [v11.6 오리지널 기능 함수들 100% 복구] */
-    map.on('baselayerchange', (e) => { currentTheme = (e.name === "Dark") ? 'dark' : 'light'; if (currentRawData.length > 0) renderEverything(currentRawData, currentProd); });
+    map.on('baselayerchange', (e) => { currentTheme = (e.name === "Dark") ? 'dark' : 'light'; renderEverything(currentRawData); });
     function showUpdateModal() { document.getElementById('admin-password').value = ""; document.getElementById('auth-section').style.display = 'block'; document.getElementById('data-input-section').style.display = 'none'; document.getElementById('update-modal').style.display = 'block'; }
     function closeModal() { document.getElementById('update-modal').style.display = 'none'; }
     function verifyAdmin() { if (document.getElementById('admin-password').value === ADMIN_PASS) { document.getElementById('auth-section').style.display = 'none'; document.getElementById('data-input-section').style.display = 'block'; } else { alert("암호 불일치."); } }
-    function clearManualData() { if(confirm("메모리를 초기화하시겠습니까?")) { localStorage.removeItem(`MANUAL_DATA_${currentProd}`); location.reload(); } }
-    function saveManualData() { const input = document.getElementById('csv-input').value; const parsed = parseUniversal(input); if(parsed.length > 0) { localStorage.setItem(`MANUAL_DATA_${currentProd}`, JSON.stringify(parsed)); alert("저장 완료."); closeModal(); renderEverything(parsed, currentProd); } }
-    
-    // [v13.11] 콤마(,)가 포함된 CSV도 완벽하게 파싱하는 정규식 엔진 (스타일 유지)
-    function parseCSV(text){ let rows=[],row=[],val="",q=0; for(let i=0;i<text.length;i++){ let c=text[i],n=text[i+1]; if(c==='"'){ if(q&&n==='"'){val+='"';i++}else{q=!q} }else if(c===','&&!q){ row.push(val);val="" }else if((c==='\r'||c==='\n')&&!q){ if(val||row.length)row.push(val); if(row.length)rows.push(row); row=[];val=""; if(c==='\r'&&n==='\n')i++ }else{val+=c} } if(val||row.length){row.push(val);rows.push(row)} return rows; }
-
-    function parseUniversal(text) { 
-        const rawRows = parseCSV(text); if(rawRows.length < 2) return []; 
-        const heads = rawRows[0].map(h => h.trim().toLowerCase().replace(/[^a-z0-9_]/g, ''));
-        return rawRows.slice(1).map(vals => { 
-            let obj = {}; 
-            heads.forEach((h, i) => { 
-                let v = vals[i] ? vals[i].trim() : ""; 
-                if (h.includes('capacity')||h==='capa') obj['capacity'] = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0;
-                else if (h==='lat'||h==='latitude') obj['lat'] = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0;
-                else if (h==='lng'||h==='longitude') obj['lng'] = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0;
-                else if (h==='startdate'||h==='start_date') obj['start_date'] = v;
-                else if (h==='enddate'||h==='end_date') obj['end_date'] = v;
-                else obj[h] = v;
+   
+    function parseUniversal(text) {
+        const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+        if(lines.length < 2) return [];
+        const del = lines[0].includes('\t') ? '\t' : ',';
+        const heads = lines[0].split(del).map(h => h.trim().toLowerCase());
+        return lines.slice(1).map(line => {
+            const vals = line.split(del); let obj = {};
+            heads.forEach((h, i) => {
+                let v = vals[i] ? vals[i].trim() : "";
+                if (["capacity", "lat", "lng"].includes(h)) v = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0;
+                obj[h] = v;
             });
-            // [v13.11] AN/BD Period 파싱 로직 추가 (스타일 유지)
-            if((!obj.start_date||!obj.end_date) && obj.period){
-                const parts = obj.period.split('~').map(s=>s.trim());
-                if(parts.length===2){ const y=new Date().getFullYear(); obj.start_date=parts[0]+' '+y; obj.end_date=parts[1]+' '+y; }
-            }
-            return obj; 
-        }); 
+            return obj;
+        });
     }
 
-    function flyToTarget(lat, lng, zoom, marker = null) { const off = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360; const pt = map.project([lat, lng], zoom).subtract([off / 2, 0]); map.flyTo(map.unproject(pt, zoom), zoom, { duration: 1.5 }); if(marker) map.once('moveend', () => marker.openPopup()); }
-    function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
-    function closeChartPanel() { document.getElementById('chart-panel').classList.remove('active'); }
+    function flyToTarget(lat, lng, zoom, marker = null) {
+        const off = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360;
+        const pt = map.project([lat, lng], zoom).subtract([off / 2, 0]);
+        map.flyTo(map.unproject(pt, zoom), zoom, { duration: 1.5 });
+        if(marker) map.once('moveend', () => marker.openPopup());
+    }
 
-    /* [고정밀 듀얼 로스 계산 엔진] */
     function getLossDays(startStr, endStr, mode) {
         if (!startStr || !endStr) return 0;
-        const s = startStr.replace(/\./g,'-').replace(/\//g,'-'); const e = endStr.replace(/\./g,'-').replace(/\//g,'-'); // 날짜 정규화
-        const pS = new Date(s); const pE = new Date(e);
+        const pS = new Date(startStr); const pE = new Date(endStr);
         if (isNaN(pS) || isNaN(pE)) return 0;
         if (mode === 'total') return Math.max(0, Math.floor((pE - pS) / 86400000) + 1);
-        const now = new Date(); const mS = new Date(now.getFullYear(), now.getMonth(), 1); const mE = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const now = new Date(); // 2026-02-17 기준
+        const mS = new Date(now.getFullYear(), now.getMonth(), 1);
+        const mE = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         const iS = new Date(Math.max(mS, pS)); const iE = new Date(Math.min(mE, pE));
         return (iS > iE) ? 0 : Math.floor((iE - iS) / 86400000) + 1;
     }
@@ -195,7 +190,8 @@
     }
 
     function createPlantCard(p, totalCapa) {
-        const capa = parseFloat(p.capacity) || 0; const mDays = getLossDays(p.start_date, p.end_date, 'month');
+        const capa = parseFloat(p.capacity) || 0;
+        const mDays = getLossDays(p.start_date, p.end_date, 'month');
         const loss = ((capa / 365) * mDays).toFixed(1);
         const card = document.createElement('div'); card.className = 'plant-card';
         card.innerHTML = `${(mDays>0)?`<span class="loss-badge">${loss}K</span>`:''}<b>${p.company}</b> <span style="color:#1597BB">(${((capa/totalCapa)*100).toFixed(1)}%)</span><div style="color:#666; font-size:0.65rem;">${capa}K | ${p.status||'Normal'}</div>`;
@@ -203,47 +199,60 @@
     }
 
     async function switchProduct(prod) {
-        currentProd = prod; document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.getElementById('btn-'+prod).classList.add('active');
-        const ovl = document.getElementById('sync-overlay'); ovl.style.display = 'flex'; ovl.style.opacity = '1'; document.getElementById('sync-main-text').innerText = "동기화 시도 중...";
+        currentProd = prod;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.id === `btn-${prod}`));
+        const ovl = document.getElementById('sync-overlay');
+        ovl.style.display = 'flex'; ovl.style.opacity = '1';
+        document.getElementById('sync-main-text').innerText = "동기화 시도 중...";
+       
         try {
             const res = await fetch(SHEET_URLS[prod] + "&t=" + new Date().getTime());
-            if (res.ok) { const data = parseUniversal(await res.text()); currentRawData = data; renderEverything(data, prod); setTimeout(() => { ovl.style.opacity = '0'; setTimeout(() => { ovl.style.display = 'none'; }, 600); }, 1200); }
-        } catch(e) { ovl.style.display = 'none'; console.log("Offline mode"); if(prod==='SM'&&typeof data_sm!=='undefined') renderEverything(data_sm); }
+            if (res.ok) {
+                currentRawData = parseUniversal(await res.text());
+                document.getElementById('sync-main-text').innerText = "온라인 연동 완료!";
+                document.getElementById('sync-main-text').style.color = "#FFD700";
+            } else { throw new Error(); }
+        } catch(e) {
+            console.log("Local Backup Mode");
+            if(prod === 'SM') currentRawData = typeof data_sm !== 'undefined' ? data_sm : [];
+            else if(prod === 'AN') currentRawData = typeof data_an !== 'undefined' ? data_an : [];
+            else if(prod === 'BD') currentRawData = typeof data_bd !== 'undefined' ? data_bd : [];
+            document.getElementById('sync-main-text').innerText = "로컬 데이터 로드됨";
+        } finally {
+            renderEverything(currentRawData);
+            setTimeout(() => { ovl.style.opacity = '0'; setTimeout(() => { ovl.style.display = 'none'; }, 600); }, 1000);
+        }
     }
 
-    function showCountryStats(countryName) {
-        const countryData = currentRawData.filter(p => p.country === countryName && !(p.status && p.status.toLowerCase().includes('deleted'))).sort((a,b) => b.capacity - a.capacity);
-        const labels = countryData.map(p => p.company), dataPoints = countryData.map(p => parseFloat(p.capacity) || 0), totalVal = dataPoints.reduce((a, b) => a + b, 0);
-        if (countryChart) countryChart.destroy();
-        const ctx = document.getElementById('country-chart').getContext('2d');
-        countryChart = new Chart(ctx, { type: 'pie', data: { labels: labels, datasets: [{ data: dataPoints, backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#7BC225', '#A64B00', '#006E6D'].slice(0, labels.length) }] }, plugins: [ChartDataLabels], options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' }, datalabels: { formatter: (v) => (v * 100 / totalVal).toFixed(1) + "%", color: '#fff', font: { weight: 'bold' } } } } });
-        document.getElementById('chart-country-name').innerText = countryName + " Share"; document.getElementById('chart-panel').classList.add('active');
-    }
-
-    /* [v11.6 지역/국가 3단계 분류 로직 완벽 복구] */
     function renderEverything(data) {
         activeMarkers.forEach(m => map.removeLayer(m)); activeMarkers = [];
-        document.getElementById('current-risk-list').innerHTML=''; document.getElementById('future-risk-list').innerHTML=''; document.getElementById('region-list').innerHTML='';
+        document.getElementById('current-risk-list').innerHTML='';
+        document.getElementById('future-risk-list').innerHTML='';
+        document.getElementById('region-list').innerHTML='';
         if (!data || data.length === 0) return;
-        const activeData = data.filter(p => !(p.status && p.status.toLowerCase().includes('deleted'))).sort((a,b) => a.company.localeCompare(b.company));
+
+        const activeData = data.filter(p => !(p.status && p.status.toString().toLowerCase().includes('deleted'))).sort((a,b) => (a.company || "").toString().localeCompare((b.company || "").toString()));
         const total = activeData.reduce((s, p) => s + (parseFloat(p.capacity) || 0), 0);
-        document.getElementById('global-val').innerText = Math.round(total).toLocaleString(); document.getElementById('total-sites').innerText = activeData.length;
+        document.getElementById('global-val').innerText = Math.round(total).toLocaleString();
+        document.getElementById('total-sites').innerText = activeData.length;
+       
         let cL = 0; const regs = {};
 
         activeData.forEach(p => {
             if(!p.lat || !p.lng) return;
-            const capa = parseFloat(p.capacity) || 0; 
+            const capa = parseFloat(p.capacity) || 0;
             const mDays = getLossDays(p.start_date, p.end_date, 'month');
             const tDays = getLossDays(p.start_date, p.end_date, 'total');
             const mLoss = (capa / 365) * mDays; const tLoss = (capa / 365) * tDays;
-            
-            // [v13.11 상태값 판별 로직 강화]
-            const st = (p.status||"").toLowerCase();
-            const isC = st.includes('current') || st.includes('shut') || st.includes('stop') || st.includes('maint') && !st.includes('future');
-            const isF = st.includes('future');
+           
+            // 상태값 안전 확인 (v13.3 핵심 수정)
+            const statusStr = (p.status || "").toString();
+            const isC = statusStr.includes('Current');
+            const isF = statusStr.includes('Future');
             if(isC) cL += mLoss;
 
-            const size = Math.sqrt(capa) * 0.55; let m;
+            const size = Math.sqrt(capa) * 0.55;
+            let m;
             if (isC || isF) {
                 const fill = isC ? '#1A1A1B' : '#D35400';
                 m = L.marker([p.lat, p.lng], { zIndexOffset: 1000, icon: L.divIcon({ html: `<svg width="${size*2.2}" height="${size*2.2}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="${fill}" stroke="white" stroke-width="2"/></svg>`, className: 'custom-triangle', iconAnchor: [size*1.1, size*1.1] }) }).addTo(map);
@@ -252,29 +261,44 @@
             }
 
             const lossText = (mLoss > 0 || tLoss > 0) ? `<span style="color:#E74C3C"> (M:-${mLoss.toFixed(1)}K / T:-${tLoss.toFixed(1)}K)</span>` : '';
-            m.bindPopup(`<div style="min-width:280px; font-family:'Pretendard'; padding:5px;"><div style="font-size:1.1rem; font-weight:900; color:var(--primary); margin-bottom:10px; border-bottom:2px solid var(--accent); padding-bottom:5px;">${p.company}</div><div class="info-row"><span class="info-label">Region / Country</span><span class="info-value">${p.region || '-'} / ${p.country || '-'}</span></div><div class="info-row"><span class="info-label">Status</span><span class="info-value" style="color:#E74C3C; font-weight:900;">${p.status} (${p.start_date||''} ~ ${p.end_date||''})</span></div><div class="info-row"><span class="info-label">Capacity (Loss)</span><span class="info-value">${capa.toLocaleString()}K MT${lossText}</span></div><div class="history-container"><div class="history-title">🕒 STATUS HISTORY</div>${buildHistoryItems(p.summary || p.history)}</div></div>`);
+            m.bindPopup(`<div style="min-width:280px; font-family:'Pretendard'; padding:5px;"><div style="font-size:1.1rem; font-weight:900; color:var(--primary); margin-bottom:10px; border-bottom:2px solid var(--accent); padding-bottom:5px;">${p.company}</div><div class="info-row"><span class="info-label">Region / Country</span><span class="info-value">${p.region || '-'} / ${p.country || '-'}</span></div><div class="info-row"><span class="info-label">Status</span><span class="info-value" style="color:#E74C3C; font-weight:900;">${statusStr || 'Normal'} (${p.start_date||''} ~ ${p.end_date||''})</span></div><div class="info-row"><span class="info-label">Capacity (Loss)</span><span class="info-value">${capa.toLocaleString()}K MT${lossText}</span></div><div class="history-container"><div class="history-title">🕒 STATUS HISTORY</div>${buildHistoryItems(p.summary || p.history || p.history_data)}</div></div>`);
+           
             m.on('click', (e) => { L.DomEvent.stopPropagation(e); flyToTarget(p.lat, p.lng, 7, m); });
             activeMarkers.push(m); p._m = m;
+
             const pCard = createPlantCard(p, total);
             if(isC) document.getElementById('current-risk-list').appendChild(pCard.cloneNode(true)).onclick = pCard.onclick;
             else if(isF) document.getElementById('future-risk-list').appendChild(pCard.cloneNode(true)).onclick = pCard.onclick;
+
             const r = p.region || "Other", c = p.country || "Other";
             if (!regs[r]) regs[r] = { name: r, countries: {}, totalP: 0, totalC: 0, sLat: 0, sLng: 0 };
             if (!regs[r].countries[c]) regs[r].countries[c] = { name: c, plants: [], cCapa: 0, sLat: 0, sLng: 0 };
-            regs[r].countries[c].plants.push(pCard); regs[r].countries[c].cCapa += capa; regs[r].totalP++; regs[r].totalC += capa; regs[r].sLat += p.lat; regs[r].sLng += p.lng;
+            regs[r].countries[c].plants.push(pCard);
+            regs[r].countries[c].cCapa += capa;
+            regs[r].totalP++; regs[r].totalC += capa; regs[r].sLat += p.lat; regs[r].sLng += p.lng;
         });
 
         Object.values(regs).sort((a,b) => b.totalP - a.totalP).forEach(r => {
-            const rDiv = document.createElement('div'); rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${r.sLat/r.totalP}, ${r.sLng/r.totalP}, 4);"><span>${r.name} (${r.totalP}) <span class="header-stats" style="color:#C0392B;">${Math.round(r.totalC).toLocaleString()}K</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
+            const rDiv = document.createElement('div');
+            rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${r.sLat/r.totalP}, ${r.sLng/r.totalP}, 4);"><span>${r.name} (${r.totalP}) <span class="header-stats" style="color:#C0392B;">${Math.round(r.totalC).toLocaleString()}K</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
             const rCont = rDiv.querySelector('.collapsible-content');
             Object.values(r.countries).sort((a,b) => b.cCapa - a.cCapa).forEach(c => {
-                const cDiv = document.createElement('div'); cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open');"><span>${c.name} (${c.plants.length}) <span class="header-stats" style="color:#1597BB; cursor:pointer;" onclick="event.stopPropagation(); showCountryStats('${c.name}')">${Math.round(c.cCapa).toLocaleString()}K 📊</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
-                const cCont = cDiv.querySelector('.collapsible-content'); c.plants.forEach(card => cCont.appendChild(card)); rCont.appendChild(cDiv);
+                const cDiv = document.createElement('div');
+                cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open');"><span>${c.name} (${c.plants.length}) <span class="header-stats" style="color:#1597BB; cursor:pointer;" onclick="event.stopPropagation(); showCountryStats('${c.name}')">${Math.round(c.cCapa).toLocaleString()}K 📊</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
+                const cCont = cDiv.querySelector('.collapsible-content');
+                c.plants.forEach(card => cCont.appendChild(card));
+                rCont.appendChild(cDiv);
             });
             document.getElementById('region-list').appendChild(rDiv);
         });
-        document.getElementById('cur-loss-mt').innerText = cL.toFixed(1) + "K"; document.getElementById('cur-ratio').innerText = total > 0 ? ((cL/(total/12))*100).toFixed(2) + "%" : "0.00%"; document.getElementById('cur-sum-h').innerText = cL.toFixed(1) + "K ▼";
+       
+        document.getElementById('cur-loss-mt').innerText = cL.toFixed(1) + "K";
+        document.getElementById('cur-ratio').innerText = total > 0 ? ((cL/(total/12))*100).toFixed(2) + "%" : "0.00%";
+        document.getElementById('cur-sum-h').innerText = cL.toFixed(1) + "K ▼";
     }
+
+    function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
+    function closeChartPanel() { document.getElementById('chart-panel').classList.remove('active'); }
     window.onload = () => switchProduct('SM');
 </script>
 </body>
