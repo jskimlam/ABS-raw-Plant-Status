@@ -2,43 +2,95 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v11.9)</title>
+    <title>Global Supply Control Tower | JS KIM (v11.7)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     <script src="data/data_sm.js"></script>
     <script src="data/data_an.js"></script>
     <script src="data/data_bd.js"></script>
     <style>
-        :root { --primary: #0A2647; --accent: #1597BB; --bg: #F0F5F9; }
+        :root { --primary: #0A2647; --accent: #1597BB; --current: #1A1A1B; --future: #D35400; --bg: #F0F5F9; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Pretendard', sans-serif; overflow: hidden; }
-        #layout { display: flex; height: 100vh; width: 100vw; }
-        #map { flex-grow: 1; height: 100%; background: #0b192e; }
-        #sidebar { width: 360px; height: 100%; background: white; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; z-index: 2000; }
-        .header { background: var(--primary); color: white; padding: 20px; }
-        .created-by { font-size: 1.2rem; color: #FFD700; font-weight: 900; }
+        #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
+        #map { flex-grow: 1; height: 100%; background: #0b192e; z-index: 1; }
+        #sidebar { position: absolute; left: 0; top: 0; width: 360px; height: 100%; background: white; z-index: 2000; transition: transform 0.4s ease; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+        #sidebar.hidden { transform: translateX(-100%); }
+        #toggle-btn { position: absolute; right: -45px; top: 20px; width: 45px; height: 45px; background: var(--primary); color: white; border: none; cursor: pointer; border-radius: 0 8px 8px 0; font-size: 18px; z-index: 2001; }
+        .header { background: var(--primary); color: white; padding: 25px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); position: relative; }
+        .created-by { font-size: 1.3rem; color: #FFD700; font-weight: 900; display: block; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); margin-bottom: 15px; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 5px; }
+        #data-mode { position: absolute; right: 20px; bottom: 20px; font-size: 0.65rem; font-weight: 900; padding: 4px 10px; border-radius: 12px; background: #95a5a6; color: white; cursor: pointer; z-index: 2002; }
+        .product-tabs { display: flex; background: #051937; padding: 5px; gap: 4px; }
+        .tab-btn { flex: 1; padding: 12px 2px; border: none; background: rgba(255,255,255,0.1); color: white; cursor: pointer; font-weight: bold; font-size: 0.75rem; border-radius: 4px; }
+        .tab-btn.active { background: var(--accent); color: white; }
         .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; background: var(--accent); color: white; gap: 1px; }
-        .metric-box { padding: 15px; text-align: center; background: var(--accent); }
-        .metric-value { font-size: 1.3rem; font-weight: 900; }
-        #list-container { flex-grow: 1; overflow-y: auto; background: var(--bg); padding: 10px; }
-        .history-table { width: 100%; border-collapse: collapse; font-size: 0.7rem; margin-top: 10px; }
-        .status-tag { padding: 2px 5px; border-radius: 4px; color: white; font-weight: bold; font-size: 0.65rem; }
+        .metric-box { padding: 12px; background: var(--accent); text-align: center; }
+        .metric-value { font-size: 1.25rem; font-weight: 900; }
+        #list-container { flex-grow: 1; overflow-y: auto; background: var(--bg); }
+        .group-header { padding: 14px 12px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.85rem; align-items: center; }
+        .region-header { background: #cbdceb; color: var(--primary); margin-top: 2px; }
+        .country-header { background: #e8eff5; font-size: 0.78rem; padding-left: 20px; border-left: 3px solid var(--accent); }
+        .header-stats { font-weight: 900; display: block; margin-top: 4px; font-size: 0.85rem; }
+        .collapsible-content { display: none; }
+        .open > .collapsible-content { display: block; }
+        .plant-card { padding: 12px 15px 12px 30px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.72rem; background: white; position: relative; }
+        .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 2px 6px; border-radius: 10px; font-size: 0.6rem; position: absolute; right: 10px; top: 10px; }
+        #update-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 420px; background: white; z-index: 11000; padding: 25px; box-shadow: 0 0 60px rgba(0,0,0,0.6); border-radius: 20px; display: none; }
+        #update-modal textarea { width: 100%; height: 180px; margin: 10px 0; font-size: 0.75rem; border: 1px solid #ddd; border-radius: 5px; padding: 8px; box-sizing: border-box; }
+        #admin-password { width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid var(--primary); border-radius: 8px; box-sizing: border-box; font-weight: bold; font-size: 1rem; text-align: center; }
+        #data-input-section { display: none; border-top: 2px dashed #eee; padding-top: 15px; margin-top: 10px; }
+        #sync-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 38, 71, 0.97); z-index: 10000; display: none; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; }
+        .sync-spinner { width: 45px; height: 45px; border: 4px solid rgba(255,255,255,0.2); border-top: 4px solid #FFD700; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .history-container { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--accent); }
+        .history-title { font-size: 0.75rem; font-weight: 900; color: var(--accent); margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
+        .history-table { width: 100%; border-collapse: collapse; font-size: 0.68rem; text-align: left; }
+        .history-table th { color: #888; padding: 4px; border-bottom: 1px solid #eee; }
+        .history-table td { padding: 6px 4px; border-bottom: 1px solid #f9f9f9; }
+        .status-tag { padding: 2px 4px; border-radius: 4px; font-weight: bold; color: white; font-size: 0.6rem; }
+        .info-row { display: flex; flex-direction: column; margin-bottom: 8px; border-bottom: 1px solid #f0f0f0; padding-bottom: 4px; }
+        .info-label { font-size: 0.65rem; color: #888; font-weight: bold; text-transform: uppercase; }
+        .info-value { font-size: 0.9rem; color: #222; font-weight: 700; }
+
+        #chart-panel { position: fixed; bottom: 0; left: 0; width: 100%; background: white; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.2); z-index: 3000; padding: 20px; box-sizing: border-box; transition: transform 0.3s ease-in-out; transform: translateY(100%); max-height: 50vh; overflow: hidden; display: flex; flex-direction: column; }
+        #chart-panel.active { transform: translateY(0); }
+        .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .close-chart-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999; }
+        .chart-container { flex-grow: 1; position: relative; }
     </style>
 </head>
 <body>
 
+<div id="sync-overlay">
+    <div class="sync-spinner"></div>
+    <div id="sync-main-text" style="font-size: 1.8rem; font-weight: 900; margin-bottom: 12px;">동기화 시도 중...</div>
+    <div style="font-size: 1.1rem; color: #1597BB; font-weight: 500;">Attempting Online Sync...</div>
+    <div style="margin-top: 60px; color: #FFD700; font-weight: 900; font-size: 1.5rem;">CREATED BY JS KIM OF LAM</div>
+</div>
+
 <div id="layout">
     <div id="sidebar">
+        <button id="toggle-btn" onclick="document.getElementById('sidebar').classList.toggle('hidden')">☰</button>
+        <div class="product-tabs">
+            <button class="tab-btn active" id="btn-SM" onclick="switchProduct('SM')">SM</button>
+            <button class="tab-btn" id="btn-AN" onclick="switchProduct('AN')">AN</button>
+            <button class="tab-btn" id="btn-BD" onclick="switchProduct('BD')">BD</button>
+        </div>
         <div class="header">
             <span class="created-by">CREATED BY JS KIM OF LAM</span>
-            <h1 style="margin:5px 0 0 0; font-size:1.1rem;">Global Supply Control Map</h1>
+            <h1 id="prod-title" onclick="resetToGlobal()" style="margin:0; font-size:1.1rem; cursor:pointer;">Global Supply Control Map</h1>
+            <span id="data-mode" onclick="showUpdateModal()">SYNC CHECK</span>
         </div>
         <div class="metrics-grid">
-            <div class="metric-box"><span>GLOBAL CAPA</span><span class="metric-value" id="global-val">0</span></div>
-            <div class="metric-box"><span>TOTAL SITES</span><span class="metric-value" id="total-sites">0</span></div>
-            <div class="metric-box" style="background:#1A1A1B;"><span>MONTH LOSS %</span><span class="metric-value" id="cur-ratio" style="color:#FF4D4D">0.00%</span></div>
-            <div class="metric-box" style="background:#1A1A1B;"><span>MONTH LOSS MT</span><span class="metric-value" id="cur-loss-mt" style="color:#FFD700">0K</span></div>
+            <div class="metric-box"><span style="font-size:0.6rem; opacity:0.8; display:block;">GLOBAL CAPA</span><span class="metric-value" id="global-val">0</span></div>
+            <div class="metric-box"><span style="font-size:0.6rem; opacity:0.8; display:block;">TOTAL SITES</span><span class="metric-value" id="total-sites">0</span></div>
+            <div class="metric-box" style="background: #1A1A1B;"><span style="font-size:0.6rem; opacity:0.8; display:block;">MONTH LOSS %</span><span class="metric-value" id="cur-ratio" style="color:#FF4D4D">0.00%</span></div>
+            <div class="metric-box" style="background: #D35400;"><span style="font-size:0.6rem; opacity:0.8; display:block;">NEXT MO. LOSS</span><span class="metric-value" id="fut-ratio" style="color:#FFD700">0.00%</span></div>
         </div>
         <div id="list-container">
+            <div id="current-risk-group" class="open"><div class="group-header" style="background:var(--current); color:white" onclick="this.parentElement.classList.toggle('open')"><span>⚠️ CUR. MONTH LOSS</span><span id="cur-sum-h"></span></div><div class="collapsible-content" id="current-risk-list"></div></div>
+            <div id="future-risk-group" class="open"><div class="group-header" style="background:var(--future); color:white" onclick="this.parentElement.classList.toggle('open')"><span>📅 FUTURE MAINT</span><span id="fut-sum-h"></span></div><div class="collapsible-content" id="future-risk-list"></div></div>
             <div id="region-list"></div>
         </div>
     </div>
@@ -47,73 +99,123 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    const SHEET_URLS = { 'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv' };
-    const map = L.map('map', {zoomControl: false}).setView([20, 100], 3);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+    const ADMIN_PASS = "jskim0111";
+    const SHEET_URLS = { 'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv', 'AN': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=263516767&single=true&output=csv', 'BD': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=607848019&single=true&output=csv' };
+    const layers = { "Standard": L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'), "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'), "Dark": L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png') };
+    const map = L.map('map', {zoomControl: false, zoomAnimation: true}).setView([20, 100], 3);
+    layers.Standard.addTo(map); L.control.layers(layers).addTo(map);
+    let currentProd = 'SM', activeMarkers = [], currentRawData = [], currentTheme = 'light';
 
-    function getMonthIntersectionDays(startStr, endStr) {
-        if (!startStr || !endStr) return 0;
+    // ★ 월간 교차 기간 계산 함수 (v11.7 핵심) ★
+    function getMonthIntersectionDays(startDateStr, endDateStr, isNextMonth = false) {
+        if (!startDateStr || !endDateStr || startDateStr === "-" || endDateStr === "-") return 0;
         const now = new Date();
-        const mStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const mEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        const pStart = new Date(startStr);
-        const pEnd = new Date(endStr);
+        const year = now.getFullYear();
+        const month = now.getMonth() + (isNextMonth ? 1 : 0);
+        
+        const mStart = new Date(year, month, 1);
+        const mEnd = new Date(year, month + 1, 0);
+        const pStart = new Date(startDateStr);
+        const pEnd = new Date(endDateStr);
+
         if (isNaN(pStart) || isNaN(pEnd)) return 0;
-        const iStart = new Date(Math.max(mStart, pStart));
-        const iEnd = new Date(Math.min(mEnd, pEnd));
-        return (iStart > iEnd) ? 0 : Math.floor((iEnd - iStart) / 86400000) + 1;
+
+        const intersectStart = new Date(Math.max(mStart, pStart));
+        const intersectEnd = new Date(Math.min(mEnd, pEnd));
+
+        if (intersectStart > intersectEnd) return 0;
+        return Math.floor((intersectEnd - intersectStart) / (1000 * 60 * 60 * 24)) + 1;
     }
 
-    function buildHistory(summary) {
-        if (!summary || summary === "0") return '<div style="color:#ccc; padding:10px; text-align:center;">기록 없음</div>';
-        const rows = summary.split('|').map(h => {
-            const p = h.split(':');
-            if (p.length < 2 || p[1].includes('1899')) return '';
-            const isW = p[0].toLowerCase().includes('shutdown') || p[0].toLowerCase().includes('maintenance');
-            return `<tr><td><span class="status-tag" style="background:${isW?'#E74C3C':'#27ae60'}">${p[0]}</span></td><td>${p[1]}</td><td><b>${p[2]}d</b></td></tr>`;
+    function buildHistoryItems(historyStr) {
+        if (!historyStr) return '<div style="color:#ccc; font-size:0.65rem; text-align:center; padding:10px;">기록이 없습니다.</div>';
+        const rows = historyStr.split('|').map(h => {
+            const parts = h.split(':');
+            const status = parts[0] || "-"; const date = parts[1] || "-"; const days = parts[2] || "0"; const period = parts[3] || "-";
+            if (date.includes('1899-12-30')) return ''; // 1899년 유령 날짜 필터링
+            const isWarning = status.toLowerCase().includes('maintenance') || status.toLowerCase().includes('shutdown') || status.toLowerCase().includes('deleted');
+            const color = isWarning ? '#E74C3C' : '#27ae60';
+            return `<tr><td><span class="status-tag" style="background:${color}">${status}</span></td><td>${date}</td><td><b>${days}d</b></td><td>${period}</td></tr>`;
         }).filter(r => r !== '').join('');
-        return `<table class="history-table"><tbody>${rows}</tbody></table>`;
+        return `<table class="history-table"><thead><tr><th>상태</th><th>날짜</th><th>일수</th><th>주기</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
-    async function switchProduct(prod) {
-        const res = await fetch(SHEET_URLS[prod] + "&t=" + new Date().getTime());
-        const lines = (await res.text()).split("\n").filter(l => l.trim().length > 0);
-        const heads = lines[0].split(',').map(h => h.trim().toLowerCase());
-        const data = lines.slice(1).map(line => {
-            const vals = line.split(','); let obj = {};
-            heads.forEach((h, i) => { obj[h] = vals[i] ? vals[i].trim() : ""; });
-            return obj;
-        });
-
+    function renderEverything(data, prodName) {
+        activeMarkers.forEach(m => map.removeLayer(m)); activeMarkers = [];
+        document.getElementById('current-risk-list').innerHTML = ''; document.getElementById('future-risk-list').innerHTML = ''; document.getElementById('region-list').innerHTML = '';
+        
         const activeData = data.filter(p => !(p.status && p.status.toLowerCase().includes('deleted')));
         const totalCapa = activeData.reduce((s, p) => s + (parseFloat(p.capacity) || 0), 0);
-        let curLoss = 0;
+        document.getElementById('global-val').innerText = Math.round(totalCapa).toLocaleString();
+        document.getElementById('total-sites').innerText = activeData.length;
+
+        let curMonthLoss = 0, nextMonthLoss = 0;
+        const now = new Date();
+        const daysInCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 
         activeData.forEach(p => {
             if(!p.lat || !p.lng) return;
-            // ★ 바뀐 머릿말 이름 적용 (start_date, end_date) ★
-            const cDays = getMonthIntersectionDays(p.start_date, p.end_date);
-            const capa = parseFloat(p.capacity) || 0;
-            const loss = (capa / 365) * cDays;
-            curLoss += loss;
+            const status = p.status || "Normal", capa = parseFloat(p.capacity) || 0;
+            const isC = status.includes('Current'), isF = status.includes('Future');
+            
+            // 이번 달 & 다음 달 겹치는 날짜 계산
+            const cDays = getMonthIntersectionDays(p.start_date, p.end_date, false);
+            const nDays = getMonthIntersectionDays(p.start_date, p.end_date, true);
+            
+            const cLoss = (capa / 365) * cDays;
+            const nLoss = (capa / 365) * nDays;
+            curMonthLoss += cLoss; nextMonthLoss += nLoss;
 
             const size = Math.sqrt(capa) * 0.55;
-            const isR = p.status.includes('Shutdown') || p.status.includes('Maintenance');
-            
-            const m = isR ? 
-                L.marker([p.lat, p.lng], { icon: L.divIcon({ html: `<svg width="${size*2}" height="${size*2}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="#1A1A1B" stroke="white" stroke-width="2"/></svg>` }) }).addTo(map) :
-                L.circleMarker([p.lat, p.lng], { radius: size, fillColor: '#5DADE2', fillOpacity: 0.8 }).addTo(map);
+            let m;
+            if (isC || isF) {
+                const fill = isC ? '#1A1A1B' : '#D35400';
+                m = L.marker([p.lat, p.lng], { zIndexOffset: 1000, icon: L.divIcon({ html: `<svg width="${size*2.2}" height="${size*2.2}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="${fill}" stroke="white" stroke-width="2"/></svg>`, className: 'custom-triangle', iconSize: [size*2.2, size*2.2] }) }).addTo(map);
+            } else {
+                m = L.circleMarker([p.lat, p.lng], { radius: size, fillColor: '#5DADE2', color: '#1B4F72', weight: 2, fillOpacity: 0.95 }).addTo(map);
+            }
 
-            m.bindPopup(`<b>${p.company}</b><br><span style="color:#E74C3C; font-weight:900;">${p.status}</span><br>Month Loss: ${loss.toFixed(1)}K MT<div style="margin-top:10px; border-top:1px dashed #ccc; padding-top:5px;"><b>HISTORY</b>${buildHistory(p.summary)}</div>`);
+            m.bindPopup(`<div style="min-width:270px; font-family:'Pretendard'; padding:5px;"><div style="font-size:1.1rem; font-weight:900; color:var(--primary); border-bottom:2px solid var(--accent);">${p.company}</div><div class="info-row"><span class="info-label">Current Status</span><span class="info-value" style="color:${(isC||isF)?'#E74C3C':'#27ae60'}">${status}</span></div><div class="info-row"><span class="info-label">Month Loss Contribution</span><span class="info-value" style="color:#E74C3C">${cLoss.toFixed(1)}K MT</span></div><div class="history-container"><div class="history-title">🕒 STATUS HISTORY</div><div class="history-list">${buildHistoryItems(p.history)}</div></div></div>`);
+            activeMarkers.push(m);
+
+            if(cDays > 0) {
+                const card = document.createElement('div'); card.className = 'plant-card';
+                card.innerHTML = `<span class="loss-badge">${cLoss.toFixed(1)}K</span><b>${p.company}</b><div style="color:#666; font-size:0.65rem;">${capa}K | ${cDays} days this month</div>`;
+                card.onclick = () => map.flyTo([p.lat, p.lng], 7);
+                document.getElementById(isC ? 'current-risk-list' : 'future-risk-list').appendChild(card);
+            }
         });
 
-        const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-        const monthlyTotal = (totalCapa / 365) * daysInMonth;
-        document.getElementById('global-val').innerText = Math.round(totalCapa).toLocaleString();
-        document.getElementById('total-sites').innerText = activeData.length;
-        document.getElementById('cur-ratio').innerText = ((curLoss/monthlyTotal)*100).toFixed(2) + "%";
-        document.getElementById('cur-loss-mt').innerText = curLoss.toFixed(1) + "K MT";
+        // 이번 달 총 생산능력 대비 손실 비율 계산 (연간 Capa / 12 대비 손실)
+        const monthlyTotalCapa = (totalCapa / 365) * daysInCurrentMonth;
+        document.getElementById('cur-ratio').innerText = monthlyTotalCapa > 0 ? ((curMonthLoss/monthlyTotalCapa)*100).toFixed(2) + "%" : "0.00%";
+        document.getElementById('cur-sum-h').innerText = curMonthLoss.toFixed(1) + "K MT";
+        document.getElementById('fut-ratio').innerText = nextMonthLoss.toFixed(1) + "K";
     }
+
+    async function switchProduct(prod) {
+        currentProd = prod;
+        const res = await fetch(SHEET_URLS[prod] + "&t=" + new Date().getTime());
+        const data = parseUniversal(await res.text());
+        renderEverything(data, prod);
+        document.getElementById('sync-overlay').style.display = 'none';
+    }
+    
+    function parseUniversal(text) { 
+        const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+        const del = lines[0].includes('\t') ? '\t' : ',';
+        const heads = lines[0].split(del).map(h => h.trim().toLowerCase());
+        return lines.slice(1).map(line => {
+            const vals = line.split(del); let obj = {};
+            heads.forEach((h, i) => {
+                let v = vals[i] ? vals[i].trim() : "";
+                if (["capacity", "lat", "lng", "days"].includes(h)) v = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0;
+                obj[h] = v;
+            });
+            return obj;
+        });
+    }
+
     window.onload = () => switchProduct('SM');
 </script>
 </body>
