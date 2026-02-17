@@ -2,251 +2,117 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v11.2)</title>
+    <title>Global Supply Control Tower | JS KIM (v11.9)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     <script src="data/data_sm.js"></script>
     <script src="data/data_an.js"></script>
     <script src="data/data_bd.js"></script>
     <style>
-        :root { --primary: #0A2647; --accent: #1597BB; --current: #1A1A1B; --future: #D35400; --bg: #F0F5F9; }
+        :root { --primary: #0A2647; --accent: #1597BB; --bg: #F0F5F9; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Pretendard', sans-serif; overflow: hidden; }
-        #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
-        #map { flex-grow: 1; height: 100%; background: #0b192e; z-index: 1; }
-        .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-popup { -webkit-backface-visibility: hidden; backface-visibility: hidden; will-change: transform; transition: none !important; }
-        #sidebar { position: absolute; left: 0; top: 0; width: 360px; height: 100%; background: white; z-index: 2000; transition: transform 0.4s ease; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
-        #sidebar.hidden { transform: translateX(-100%); }
-        #toggle-btn { position: absolute; right: -45px; top: 20px; width: 45px; height: 45px; background: var(--primary); color: white; border: none; cursor: pointer; border-radius: 0 8px 8px 0; font-size: 18px; z-index: 2001; }
-        .header { background: var(--primary); color: white; padding: 25px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); position: relative; }
-        .created-by { font-size: 1.3rem; color: #FFD700; font-weight: 900; display: block; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); margin-bottom: 15px; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 5px; }
-        #data-mode { position: absolute; right: 20px; bottom: 20px; font-size: 0.65rem; font-weight: 900; padding: 4px 10px; border-radius: 12px; background: #95a5a6; color: white; cursor: pointer; z-index: 2002; }
-        .product-tabs { display: flex; background: #051937; padding: 5px; gap: 4px; }
-        .tab-btn { flex: 1; padding: 12px 2px; border: none; background: rgba(255,255,255,0.1); color: white; cursor: pointer; font-weight: bold; font-size: 0.75rem; border-radius: 4px; }
-        .tab-btn.active { background: var(--accent); color: white; }
+        #layout { display: flex; height: 100vh; width: 100vw; }
+        #map { flex-grow: 1; height: 100%; background: #0b192e; }
+        #sidebar { width: 360px; height: 100%; background: white; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; z-index: 2000; }
+        .header { background: var(--primary); color: white; padding: 20px; }
+        .created-by { font-size: 1.2rem; color: #FFD700; font-weight: 900; }
         .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; background: var(--accent); color: white; gap: 1px; }
-        .metric-box { padding: 12px; background: var(--accent); text-align: center; }
-        .metric-value { font-size: 1.25rem; font-weight: 900; }
-        #list-container { flex-grow: 1; overflow-y: auto; background: var(--bg); }
-        .group-header { padding: 14px 12px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.85rem; align-items: center; }
-        .region-header { background: #cbdceb; color: var(--primary); margin-top: 2px; }
-        .country-header { background: #e8eff5; font-size: 0.78rem; padding-left: 20px; border-left: 3px solid var(--accent); }
-        .header-stats { font-weight: 900; display: block; margin-top: 4px; font-size: 0.85rem; }
-        .collapsible-content { display: none; }
-        .open > .collapsible-content { display: block; }
-        .plant-card { padding: 12px 15px 12px 30px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.72rem; background: white; position: relative; }
-        .plant-card:hover { background: #f9f9f9; }
-        .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 2px 6px; border-radius: 10px; font-size: 0.6rem; position: absolute; right: 10px; top: 10px; }
-        #update-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 420px; background: white; z-index: 11000; padding: 25px; box-shadow: 0 0 60px rgba(0,0,0,0.6); border-radius: 20px; display: none; }
-        #update-modal textarea { width: 100%; height: 180px; margin: 10px 0; font-size: 0.75rem; border: 1px solid #ddd; border-radius: 5px; padding: 8px; box-sizing: border-box; }
-        #admin-password { width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid var(--primary); border-radius: 8px; box-sizing: border-box; font-weight: bold; font-size: 1rem; text-align: center; }
-        #data-input-section { display: none; border-top: 2px dashed #eee; padding-top: 15px; margin-top: 10px; }
-        #sync-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 38, 71, 0.97); z-index: 10000; display: none; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; transition: opacity 0.4s ease; }
-        .sync-spinner { width: 45px; height: 45px; border: 4px solid rgba(255,255,255,0.2); border-top: 4px solid #FFD700; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 20px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .info-row { display: flex; flex-direction: column; margin-bottom: 8px; border-bottom: 1px solid #f0f0f0; padding-bottom: 4px; }
-        .info-label { font-size: 0.65rem; color: #888; font-weight: bold; text-transform: uppercase; }
-        .info-value { font-size: 0.9rem; color: #222; font-weight: 700; }
-        .history-container { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--accent); }
-        .history-title { font-size: 0.75rem; font-weight: 900; color: var(--accent); margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
-        .history-list { display: flex; flex-direction: column; gap: 5px; max-height: 120px; overflow-y: auto; padding-right: 5px; }
-        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: #F8F9FA; border-left: 3px solid #ddd; font-size: 0.72rem; }
-        .history-item.shutdown { border-left-color: #E74C3C; background: #FDEDEC; }
-        #chart-panel { position: fixed; bottom: 0; left: 0; width: 100%; background: white; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.2); z-index: 3000; padding: 20px; box-sizing: border-box; transition: transform 0.3s ease-in-out; transform: translateY(100%); max-height: 50vh; overflow: hidden; display: flex; flex-direction: column; }
-        #chart-panel.active { transform: translateY(0); }
-        .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .chart-title { font-size: 1.1rem; font-weight: 900; color: var(--primary); }
-        .close-chart-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999; }
-        .chart-container { flex-grow: 1; position: relative; }
+        .metric-box { padding: 15px; text-align: center; background: var(--accent); }
+        .metric-value { font-size: 1.3rem; font-weight: 900; }
+        #list-container { flex-grow: 1; overflow-y: auto; background: var(--bg); padding: 10px; }
+        .history-table { width: 100%; border-collapse: collapse; font-size: 0.7rem; margin-top: 10px; }
+        .status-tag { padding: 2px 5px; border-radius: 4px; color: white; font-weight: bold; font-size: 0.65rem; }
     </style>
 </head>
 <body>
 
-<div id="update-modal">
-    <div id="auth-section">
-        <h3 style="margin-top:0; color:var(--primary);">🔒 JS KIM Security</h3>
-        <input type="password" id="admin-password" placeholder="Admin Password">
-        <button style="background:var(--primary); color:white; padding:12px; width:100%; border:none; border-radius:8px; cursor:pointer; font-weight:900;" onclick="verifyAdmin()">인증</button>
-    </div>
-    <div id="data-input-section">
-        <textarea id="csv-input" placeholder="데이터를 붙여넣으세요..."></textarea>
-        <div style="display: flex; gap: 10px;">
-            <button style="flex: 2; background:#27ae60; color:white; padding:15px; border:none; border-radius:10px; cursor:pointer; font-weight:900;" onclick="saveManualData()">저장</button>
-            <button style="flex: 1; background:#e67e22; color:white; padding:15px; border:none; border-radius:10px; cursor:pointer; font-weight:900;" onclick="clearManualData()">초기화</button>
-        </div>
-    </div>
-    <button style="width:100%; margin-top:15px; border:none; padding:10px; border-radius:8px; cursor:pointer;" onclick="closeModal()">닫기</button>
-</div>
-
-<div id="sync-overlay">
-    <div id="sync-icon" class="sync-spinner"></div>
-    <div id="sync-main-text" style="font-size: 1.8rem; font-weight: 900; margin-bottom: 12px;">동기화 시도 중...</div>
-    <div id="sync-sub-text" style="font-size: 1.1rem; color: #1597BB; font-weight: 500;">Attempting Online Sync...</div>
-    <div style="margin-top: 60px; color: #FFD700; font-weight: 900; font-size: 1.5rem;">CREATED BY JS KIM OF LAM</div>
-</div>
-
 <div id="layout">
     <div id="sidebar">
-        <button id="toggle-btn" onclick="document.getElementById('sidebar').classList.toggle('hidden')">☰</button>
-        <div class="product-tabs">
-            <button class="tab-btn active" id="btn-SM" onclick="switchProduct('SM')">SM</button>
-            <button class="tab-btn" id="btn-AN" onclick="switchProduct('AN')">AN</button>
-            <button class="tab-btn" id="btn-BD" onclick="switchProduct('BD')">BD</button>
-        </div>
         <div class="header">
             <span class="created-by">CREATED BY JS KIM OF LAM</span>
-            <h1 id="prod-title" onclick="resetToGlobal()" style="margin:0; font-size:1.1rem; cursor:pointer;">Global Supply Control Map</h1>
-            <span id="data-mode" onclick="showUpdateModal()">SYNC CHECK</span>
+            <h1 style="margin:5px 0 0 0; font-size:1.1rem;">Global Supply Control Map</h1>
         </div>
         <div class="metrics-grid">
-            <div class="metric-box"><span style="font-size:0.6rem; opacity:0.8; display:block;">GLOBAL CAPA</span><span class="metric-value" id="global-val">0</span></div>
-            <div class="metric-box"><span style="font-size:0.6rem; opacity:0.8; display:block;">TOTAL SITES</span><span class="metric-value" id="total-sites">0</span></div>
-            <div class="metric-box" style="background: #1A1A1B;"><span style="font-size:0.6rem; opacity:0.8; display:block;">CUR. LOSS %</span><span class="metric-value" id="cur-ratio" style="color:#FF4D4D">0.00%</span></div>
-            <div class="metric-box" style="background: #D35400;"><span style="font-size:0.6rem; opacity:0.8; display:block;">FUT. LOSS %</span><span class="metric-value" id="fut-ratio" style="color:#FFD700">0.00%</span></div>
+            <div class="metric-box"><span>GLOBAL CAPA</span><span class="metric-value" id="global-val">0</span></div>
+            <div class="metric-box"><span>TOTAL SITES</span><span class="metric-value" id="total-sites">0</span></div>
+            <div class="metric-box" style="background:#1A1A1B;"><span>MONTH LOSS %</span><span class="metric-value" id="cur-ratio" style="color:#FF4D4D">0.00%</span></div>
+            <div class="metric-box" style="background:#1A1A1B;"><span>MONTH LOSS MT</span><span class="metric-value" id="cur-loss-mt" style="color:#FFD700">0K</span></div>
         </div>
         <div id="list-container">
-            <div id="current-risk-group" class="open"><div class="group-header" style="background:var(--current); color:white" onclick="this.parentElement.classList.toggle('open')"><span>⚠️ CURRENT RISK</span><span id="cur-sum-h"></span></div><div class="collapsible-content" id="current-risk-list"></div></div>
-            <div id="future-risk-group" class="open"><div class="group-header" style="background:var(--future); color:white" onclick="this.parentElement.classList.toggle('open')"><span>📅 FUTURE MAINT</span><span id="fut-sum-h"></span></div><div class="collapsible-content" id="future-risk-list"></div></div>
-            <div style="background: var(--primary); color:white; padding:10px 12px; font-size:0.75rem; font-weight:bold; margin-top:10px;">🌐 REGIONAL DIRECTORY</div>
             <div id="region-list"></div>
         </div>
     </div>
     <div id="map"></div>
 </div>
 
-<div id="chart-panel">
-    <div class="chart-header">
-        <span class="chart-title" id="chart-country-name">Country Capacity Share</span>
-        <button class="close-chart-btn" onclick="closeChartPanel()">×</button>
-    </div>
-    <div class="chart-container"><canvas id="country-chart"></canvas></div>
-</div>
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    const ADMIN_PASS = "jskim0111";
-    const SHEET_URLS = { 'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv', 'AN': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=263516767&single=true&output=csv', 'BD': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=607848019&single=true&output=csv' };
-    const layers = { "Standard": L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'), "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'), "Dark": L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png') };
-    const map = L.map('map', {zoomControl: false, zoomAnimation: true}).setView([20, 100], 3);
-    layers.Standard.addTo(map); L.control.layers(layers).addTo(map);
-    let currentProd = 'SM', activeMarkers = [], currentRawData = [], currentTheme = 'light', countryChart = null;
+    const SHEET_URLS = { 'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv' };
+    const map = L.map('map', {zoomControl: false}).setView([20, 100], 3);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-    map.on('baselayerchange', (e) => { currentTheme = (e.name === "Dark") ? 'dark' : 'light'; if (currentRawData.length > 0) renderEverything(currentRawData, currentProd); });
-    function showUpdateModal() { document.getElementById('admin-password').value = ""; document.getElementById('auth-section').style.display = 'block'; document.getElementById('data-input-section').style.display = 'none'; document.getElementById('update-modal').style.display = 'block'; }
-    function closeModal() { document.getElementById('update-modal').style.display = 'none'; }
-    function verifyAdmin() { if (document.getElementById('admin-password').value === ADMIN_PASS) { document.getElementById('auth-section').style.display = 'none'; document.getElementById('data-input-section').style.display = 'block'; } else { alert("암호 불일치."); } }
-    function saveManualData() { const input = document.getElementById('csv-input').value; const parsed = parseUniversal(input); if(parsed.length > 0) { localStorage.setItem(`MANUAL_DATA_${currentProd}`, JSON.stringify(parsed)); alert("저장 완료."); closeModal(); renderEverything(parsed, currentProd); } }
-    function clearManualData() { if(confirm("메모리를 초기화하시겠습니까?")) { localStorage.removeItem(`MANUAL_DATA_${currentProd}`); location.reload(); } }
-    function parseUniversal(text) { const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0); if(lines.length < 2) return []; const del = lines[0].includes('\t') ? '\t' : ','; const heads = lines[0].split(del).map(h => h.trim().toLowerCase()); return lines.slice(1).map(line => { const vals = line.split(del); let obj = {}; heads.forEach((h, i) => { let v = vals[i] ? vals[i].trim() : ""; if (["capacity", "lat", "lng", "days"].includes(h)) v = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0; obj[h] = v; }); return obj; }); }
-    function flyToTarget(lat, lng, zoom, marker = null) { const off = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 360; const pt = map.project([lat, lng], zoom).subtract([off / 2, 0]); map.flyTo(map.unproject(pt, zoom), zoom, { duration: 1.5 }); if(marker) map.once('moveend', () => marker.openPopup()); }
-    function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
-    function buildHistoryItems(historyStr) { if (!historyStr) return '<div style="color:#ccc; font-size:0.65rem; text-align:center; padding:10px;">기록이 없습니다.</div>'; return historyStr.split('|').map(h => { const [status, time] = h.split(':'); const isShutdown = status && status.toLowerCase().includes('shutdown'); return `<div class="history-item ${isShutdown ? 'shutdown' : ''}"><strong>${status}</strong><span>${time}</span></div>`; }).join(''); }
-    function closeChartPanel() { document.getElementById('chart-panel').classList.remove('active'); }
+    function getMonthIntersectionDays(startStr, endStr) {
+        if (!startStr || !endStr) return 0;
+        const now = new Date();
+        const mStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const mEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const pStart = new Date(startStr);
+        const pEnd = new Date(endStr);
+        if (isNaN(pStart) || isNaN(pEnd)) return 0;
+        const iStart = new Date(Math.max(mStart, pStart));
+        const iEnd = new Date(Math.min(mEnd, pEnd));
+        return (iStart > iEnd) ? 0 : Math.floor((iEnd - iStart) / 86400000) + 1;
+    }
 
-    // 클릭 가능한 카드 생성 함수 (이동 기능 완벽 보강)
-    function createPlantCard(p, totalCapa) {
-        const status = p.status || "Normal", capa = parseFloat(p.capacity) || 0, days = parseFloat(p.days) || 0;
-        const isC = status.includes('Current'), isF = status.includes('Future'), loss = ((capa / 365) * days).toFixed(1);
-        const card = document.createElement('div');
-        card.className = 'plant-card';
-        card.innerHTML = `${(isC||isF)?`<span class="loss-badge">${loss}K</span>`:''}<b>${p.company}</b> <span style="color:#1597BB">(${((capa/totalCapa)*100).toFixed(1)}%)</span><div style="color:#666; font-size:0.65rem;">${capa}K | ${status}</div>`;
-        card.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); };
-        return card;
+    function buildHistory(summary) {
+        if (!summary || summary === "0") return '<div style="color:#ccc; padding:10px; text-align:center;">기록 없음</div>';
+        const rows = summary.split('|').map(h => {
+            const p = h.split(':');
+            if (p.length < 2 || p[1].includes('1899')) return '';
+            const isW = p[0].toLowerCase().includes('shutdown') || p[0].toLowerCase().includes('maintenance');
+            return `<tr><td><span class="status-tag" style="background:${isW?'#E74C3C':'#27ae60'}">${p[0]}</span></td><td>${p[1]}</td><td><b>${p[2]}d</b></td></tr>`;
+        }).filter(r => r !== '').join('');
+        return `<table class="history-table"><tbody>${rows}</tbody></table>`;
     }
 
     async function switchProduct(prod) {
-        currentProd = prod; document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.getElementById('btn-' + prod).classList.add('active');
-        const ovl = document.getElementById('sync-overlay'), main = document.getElementById('sync-main-text'), icon = document.getElementById('sync-icon');
-        ovl.style.display = 'flex'; ovl.style.opacity = '1'; icon.className = "sync-spinner"; icon.innerHTML = ""; main.innerText = "동기화 시도 중...";
-        try { const res = await fetch(SHEET_URLS[prod] + "&t=" + new Date().getTime()); if (!res.ok) throw new Error(); const data = parseUniversal(await res.text()); main.innerText = "온라인 연동 완료"; icon.className = ""; icon.innerHTML = "<div style='font-size:50px;'>✅</div>"; document.getElementById('data-mode').innerText = "LIVE SYNC"; document.getElementById('data-mode').style.background = "#2ECC71"; currentRawData = data; renderEverything(data, prod); setTimeout(() => { ovl.style.opacity = '0'; setTimeout(() => { ovl.style.display = 'none'; }, 600); }, 1200); }
-        catch (e) { icon.innerHTML = ""; main.innerText = "보안 확인: 픽스 모드 전환"; main.style.color = "#FF4D4D"; setTimeout(() => { let d = []; const lD = localStorage.getItem(`MANUAL_DATA_${prod}`); if (lD) { d = JSON.parse(lD); document.getElementById('data-mode').innerText = "MEMORY MODE"; } else { try { if (prod === 'SM') d = data_sm; if (prod === 'AN') d = data_an; if (prod === 'BD') d = data_bd; document.getElementById('data-mode').innerText = "FIXED MODE"; } catch(err) {} } document.getElementById('data-mode').style.background = "#E74C3C"; currentRawData = d; renderEverything(d, prod); setTimeout(() => { ovl.style.opacity = '0'; setTimeout(() => { ovl.style.display = 'none'; main.style.color = "white"; }, 600); }, 1000); }, 1000); }
-    }
-
-    // ★ 수정된 차트 표시 함수: 퍼센트(%) 표시 레이블 추가 ★
-    function showCountryStats(countryName) {
-        const countryData = currentRawData.filter(p => p.country === countryName && !(p.status && p.status.toLowerCase().includes('deleted'))).sort((a,b) => (b.capacity || 0) - (a.capacity || 0));
-        if (countryData.length === 0) return alert("표시할 데이터가 없습니다.");
-        const labels = countryData.map(p => p.company), dataPoints = countryData.map(p => parseFloat(p.capacity) || 0);
-        const totalVal = dataPoints.reduce((a, b) => a + b, 0);
-
-        if (countryChart) countryChart.destroy();
-        const ctx = document.getElementById('country-chart').getContext('2d');
-       
-        countryChart = new Chart(ctx, {
-            type: 'pie',
-            data: { labels: labels, datasets: [{ data: dataPoints, backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#7BC225', '#A64B00', '#006E6D'].slice(0, labels.length), borderWidth: 1 }] },
-            plugins: [ChartDataLabels], // 데이터 레이블 플러그인 등록
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'right', labels: { font: { family: 'Pretendard', size: 11 } } },
-                    title: { display: true, text: `Total: ${Math.round(totalVal).toLocaleString()}K MT`, font: { family: 'Pretendard', size: 14, weight: 'bold' } },
-                    datalabels: { // ★ 퍼센트 수치 표시 설정 ★
-                        formatter: (value, ctx) => { return (value * 100 / totalVal).toFixed(1) + "%"; },
-                        color: '#fff',
-                        font: { weight: 'bold', size: 12 },
-                        textShadowBlur: 3,
-                        textShadowColor: 'rgba(0,0,0,0.5)',
-                        display: (ctx) => { return (ctx.dataset.data[ctx.dataIndex] * 100 / totalVal) > 3; } // 3% 미만은 겹침 방지를 위해 숨김
-                    }
-                }
-            }
+        const res = await fetch(SHEET_URLS[prod] + "&t=" + new Date().getTime());
+        const lines = (await res.text()).split("\n").filter(l => l.trim().length > 0);
+        const heads = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const data = lines.slice(1).map(line => {
+            const vals = line.split(','); let obj = {};
+            heads.forEach((h, i) => { obj[h] = vals[i] ? vals[i].trim() : ""; });
+            return obj;
         });
-        document.getElementById('chart-country-name').innerText = `${countryName} Capacity Share`; document.getElementById('chart-panel').classList.add('active');
-    }
 
-    function renderEverything(data, prodName) {
-        activeMarkers.forEach(m => map.removeLayer(m)); activeMarkers = [];
-        document.getElementById('current-risk-list').innerHTML = ''; document.getElementById('future-risk-list').innerHTML = ''; document.getElementById('region-list').innerHTML = '';
-        if (!data || data.length === 0) return;
-        const activeData = data.filter(p => !(p.status && p.status.toLowerCase().includes('deleted'))).sort((a, b) => (a.company || "").toLowerCase().localeCompare((b.company || "").toLowerCase()));
-        const total = activeData.reduce((s, p) => s + (parseFloat(p.capacity) || 0), 0);
-        document.getElementById('global-val').innerText = Math.round(total).toLocaleString(); document.getElementById('total-sites').innerText = activeData.length;
-        let cL = 0, fL = 0; const regs = {};
-        const regionColors = { light: { "NEA": { f: "#5DADE2", b: "#1B4F72" }, "SEA": { f: "#48C9B0", b: "#0E6251" }, "NA": { f: "#F39C12", b: "#7E5109" }, "WE": { f: "#8E44AD", b: "#4A235A" }, "CE": { f: "#E91E63", b: "#880E4F" }, "CIS": { f: "#1DE9B6", b: "#FFFFFF" }, "ME": { f: "#D35400", b: "#6E2C00" }, "Other": { f: "#BDC3C7", b: "#566573" } }, dark: { "NEA": { f: "#00E5FF", b: "#FFFFFF" }, "SEA": { f: "#00FFC8", b: "#FFFFFF" }, "NA": { f: "#FFD600", b: "#FFFFFF" }, "WE": { f: "#E040FB", b: "#FFFFFF" }, "CE": { f: "#FF4081", b: "#FFFFFF" }, "CIS": { f: "#1DE9B6", b: "#FFFFFF" }, "ME": { f: "#FF6E40", b: "#FFFFFF" }, "Other": { f: "#FFFFFF", b: "#000000" } } };
+        const activeData = data.filter(p => !(p.status && p.status.toLowerCase().includes('deleted')));
+        const totalCapa = activeData.reduce((s, p) => s + (parseFloat(p.capacity) || 0), 0);
+        let curLoss = 0;
 
         activeData.forEach(p => {
             if(!p.lat || !p.lng) return;
-            const status = p.status || "Normal", capa = parseFloat(p.capacity) || 0, days = parseFloat(p.days) || 0;
-            const isC = status.includes('Current'), isF = status.includes('Future'), loss = ((capa / 365) * days).toFixed(1);
-            if(isC) cL += parseFloat(loss); if(isF) fL += parseFloat(loss);
-            const size = Math.sqrt(capa) * 0.55; let m;
-            if (isC || isF) {
-                const fill = isC ? (currentTheme === 'dark' ? '#FF5252' : '#1A1A1B') : (currentTheme === 'dark' ? '#FFAB40' : '#D35400');
-                const border = (fill === '#1A1A1B') ? '#FFFFFF' : (currentTheme === 'dark' ? '#FFFFFF' : '#000000');
-                m = L.marker([p.lat, p.lng], { zIndexOffset: 1000, icon: L.divIcon({ html: `<svg width="${size*2.2}" height="${size*2.2}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="${fill}" stroke="${border}" stroke-width="2"/></svg>`, className: 'custom-triangle', iconSize: [size*2.2, size*2.2], iconAnchor: [size*1.1, size*1.1] }) }).addTo(map);
-            } else {
-                const colors = regionColors[currentTheme][p.region] || regionColors[currentTheme].Other;
-                m = L.circleMarker([p.lat, p.lng], { radius: size, fillColor: colors.f, color: colors.b, weight: 2, fillOpacity: 0.95, stroke: true }).addTo(map);
-            }
-            m.bindPopup(`<div style="min-width:210px; font-family:'Pretendard'; padding:5px;"><div style="font-size:1.1rem; font-weight:900; color:var(--primary); margin-bottom:10px; border-bottom:2px solid var(--accent); padding-bottom:5px;">${p.company}</div><div class="info-row"><span class="info-label">Region / Country</span><span class="info-value">${p.region} / ${p.country}</span></div><div class="info-row"><span class="info-label">Capacity</span><span class="info-value">${capa.toLocaleString()}K MT</span></div><div class="info-row"><span class="info-label">Current Status</span><span class="info-value" style="color:${(isC||isF)?'#E74C3C':'#27ae60'}">${status}</span></div><div class="history-container"><div class="history-title">🕒 STATUS HISTORY</div><div class="history-list">${buildHistoryItems(p.history)}</div></div></div>`);
-            m.on('click', (e) => { L.DomEvent.stopPropagation(e); flyToTarget(p.lat, p.lng, 7, m); });
-            activeMarkers.push(m); p._m = m;
+            // ★ 바뀐 머릿말 이름 적용 (start_date, end_date) ★
+            const cDays = getMonthIntersectionDays(p.start_date, p.end_date);
+            const capa = parseFloat(p.capacity) || 0;
+            const loss = (capa / 365) * cDays;
+            curLoss += loss;
 
-            const pCard = createPlantCard(p, total);
-            if(isC) document.getElementById('current-risk-list').appendChild(pCard.cloneNode(true)).onclick = pCard.onclick;
-            else if(isF) document.getElementById('future-risk-list').appendChild(pCard.cloneNode(true)).onclick = pCard.onclick;
-           
-            const r = p.region || "Unknown", c = p.country || "Other";
-            if (!regs[r]) regs[r] = { name: r, countries: {}, totalP: 0, totalC: 0, sLat: 0, sLng: 0 };
-            if (!regs[r].countries[c]) regs[r].countries[c] = { name: c, plants: [], cCapa: 0, sLat: 0, sLng: 0 };
-            regs[r].countries[c].plants.push(pCard); regs[r].countries[c].cCapa += capa; regs[r].countries[c].sLat += p.lat; regs[r].countries[c].sLng += p.lng;
-            regs[r].totalP++; regs[r].totalC += capa; regs[r].sLat += p.lat; regs[r].sLng += p.lng;
+            const size = Math.sqrt(capa) * 0.55;
+            const isR = p.status.includes('Shutdown') || p.status.includes('Maintenance');
+            
+            const m = isR ? 
+                L.marker([p.lat, p.lng], { icon: L.divIcon({ html: `<svg width="${size*2}" height="${size*2}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="#1A1A1B" stroke="white" stroke-width="2"/></svg>` }) }).addTo(map) :
+                L.circleMarker([p.lat, p.lng], { radius: size, fillColor: '#5DADE2', fillOpacity: 0.8 }).addTo(map);
+
+            m.bindPopup(`<b>${p.company}</b><br><span style="color:#E74C3C; font-weight:900;">${p.status}</span><br>Month Loss: ${loss.toFixed(1)}K MT<div style="margin-top:10px; border-top:1px dashed #ccc; padding-top:5px;"><b>HISTORY</b>${buildHistory(p.summary)}</div>`);
         });
 
-        document.getElementById('cur-ratio').innerText = total > 0 ? ((cL/total)*100).toFixed(2) + "%" : "0.00%"; document.getElementById('fut-ratio').innerText = total > 0 ? ((fL/total)*100).toFixed(2) + "%" : "0.00%";
-        document.getElementById('cur-sum-h').innerText = cL.toFixed(1) + "K ▼"; document.getElementById('fut-sum-h').innerText = fL.toFixed(1) + "K ▼";
-
-        Object.values(regs).sort((a,b) => b.totalP - a.totalP).forEach(r => {
-            const rDiv = document.createElement('div'); rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${r.sLat/r.totalP}, ${r.sLng/r.totalP}, 4);"><span>${r.name} (${r.totalP}) <span class="header-stats" style="color:#C0392B;">${Math.round(r.totalC).toLocaleString()}K</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
-            const rCont = rDiv.querySelector('.collapsible-content');
-            Object.values(r.countries).sort((a,b) => b.cCapa - a.cCapa).forEach(c => {
-                const cDiv = document.createElement('div'); cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${c.sLat/c.plants.length}, ${c.sLng/c.plants.length}, 5.5);"><span>${c.name} (${c.plants.length}) <span class="header-stats chart-trigger" style="color:#1597BB; cursor:pointer;" onclick="event.stopPropagation(); showCountryStats('${c.name}')">${Math.round(c.cCapa).toLocaleString()}K 📊</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
-                const cCont = cDiv.querySelector('.collapsible-content'); c.plants.forEach(pCard => cCont.appendChild(pCard)); rCont.appendChild(cDiv);
-            });
-            document.getElementById('region-list').appendChild(rDiv);
-        });
+        const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+        const monthlyTotal = (totalCapa / 365) * daysInMonth;
+        document.getElementById('global-val').innerText = Math.round(totalCapa).toLocaleString();
+        document.getElementById('total-sites').innerText = activeData.length;
+        document.getElementById('cur-ratio').innerText = ((curLoss/monthlyTotal)*100).toFixed(2) + "%";
+        document.getElementById('cur-loss-mt').innerText = curLoss.toFixed(1) + "K MT";
     }
     window.onload = () => switchProduct('SM');
 </script>
