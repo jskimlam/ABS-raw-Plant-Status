@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v13.7)</title>
+    <title>Global Supply Control Tower | JS KIM (v13.8)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
@@ -165,7 +165,6 @@
         } else { alert("암호 불일치."); } 
     }
 
-    /* [v13.7 강력한 CSV 파서 - 쉼표/따옴표 완벽 처리] */
     function parseCSV(text) {
         const rows = [];
         let row = [];
@@ -175,7 +174,7 @@
             const char = text[i];
             const nextChar = text[i+1];
             if (char === '"') {
-                if (inQuote && nextChar === '"') { val += '"'; i++; } // Escaped quote
+                if (inQuote && nextChar === '"') { val += '"'; i++; } 
                 else { inQuote = !inQuote; }
             } else if (char === ',' && !inQuote) {
                 row.push(val); val = "";
@@ -195,13 +194,12 @@
     function parseUniversal(text) {
         const rawRows = parseCSV(text);
         if (rawRows.length < 2) return [];
-        const heads = rawRows[0].map(h => h.trim().toLowerCase().replace(/[^a-z0-9_]/g, '')); // 헤더 정규화 (Lat vs lat 등 해결)
+        const heads = rawRows[0].map(h => h.trim().toLowerCase().replace(/[^a-z0-9_]/g, '')); 
         
         return rawRows.slice(1).map(vals => {
             let obj = {};
             heads.forEach((h, i) => {
                 let v = vals[i] ? vals[i].trim() : "";
-                // 헤더 매핑 유연화
                 if (h === 'latitude' || h === 'lat') { obj['lat'] = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0; }
                 else if (h === 'longitude' || h === 'lng' || h === 'long') { obj['lng'] = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0; }
                 else if (h.includes('capacity') || h === 'capa') { obj['capacity'] = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0; }
@@ -220,10 +218,22 @@
         if(marker) map.once('moveend', () => marker.openPopup()); 
     }
 
+    /* [v13.8 핵심: 스마트 날짜 정규화 - 모든 포맷 호환] */
+    function normalizeDate(dateStr) {
+        if(!dateStr) return null;
+        let s = dateStr.toString().trim();
+        // 2024.01.01 or 2024/01/01 -> 2024-01-01 변환
+        s = s.replace(/\./g, '-').replace(/\//g, '-'); 
+        return s;
+    }
+
     function getLossDays(startStr, endStr, mode) {
         if (!startStr || !endStr) return 0;
-        const pS = new Date(startStr); const pE = new Date(endStr);
+        const pS = new Date(normalizeDate(startStr)); 
+        const pE = new Date(normalizeDate(endStr));
+        
         if (isNaN(pS) || isNaN(pE)) return 0;
+        
         if (mode === 'total') return Math.max(0, Math.floor((pE - pS) / 86400000) + 1);
         const now = new Date(); 
         const mS = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -277,6 +287,7 @@
         }
     }
 
+    /* [v13.8 핵심: 로스 계산 로직 강화] */
     function renderEverything(data) {
         activeMarkers.forEach(m => map.removeLayer(m)); activeMarkers = [];
         document.getElementById('current-risk-list').innerHTML=''; 
@@ -300,7 +311,16 @@
             
             const rawStatus = (p.status || "").toString();
             const statusLower = rawStatus.toLowerCase();
-            const isC = statusLower.includes('current') || statusLower.includes('shutdown') || statusLower.includes('shut down') || (statusLower.includes('maint') && !statusLower.includes('future'));
+            
+            // [v13.8 상태 키워드 대폭 확장]
+            const isC = statusLower.includes('current') || 
+                        statusLower.includes('shut') || 
+                        statusLower.includes('stop') || 
+                        statusLower.includes('off') || // offline
+                        statusLower.includes('repair') ||
+                        statusLower.includes('t/a') || // turnaround
+                        (statusLower.includes('maint') && !statusLower.includes('future'));
+            
             const isF = statusLower.includes('future');
             
             if(isC) cL += mLoss;
