@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v13.17)</title>
+    <title>Global Supply Control Tower | JS KIM (v13.19)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
@@ -74,7 +74,7 @@
         <button style="background:var(--primary); color:white; padding:12px; width:100%; border:none; border-radius:8px; cursor:pointer; font-weight:900;" onclick="verifyAdmin()">인증</button>
     </div>
     <div id="data-input-section">
-        <textarea id="csv-input" placeholder="CSV 데이터를 붙여넣으세요..."></textarea>
+        <textarea id="csv-input" placeholder="데이터를 붙여넣으세요..."></textarea>
         <div style="display: flex; gap: 10px;">
             <button style="flex: 2; background:#27ae60; color:white; padding:15px; border:none; border-radius:10px; cursor:pointer; font-weight:900;" onclick="saveManualData()">저장</button>
             <button style="flex: 1; background:#e67e22; color:white; padding:15px; border:none; border-radius:10px; cursor:pointer; font-weight:900;" onclick="clearManualData()">초기화</button>
@@ -130,23 +130,25 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     const ADMIN_PASS = "jskim0111";
-    // [v13.17 연동 주의: gid 번호가 틀리면 무조건 SM 시트로 연결됩니다. 주소창의 gid를 확인하세요]
+    // [v13.19 중요: 새로운 스프레드시트 ID 연동 완료]
+    const SPREADSHEET_ID = "1Z1yDaUTEbSTQancJ5CPuG4juNgW0rd1tukJtCTtyZb8";
     const SHEET_URLS = {
-        'SM': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnEnq-XAdjJD8D9c-R85/pub?gid=0&single=true&output=csv',
-        'AN': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=263516767&single=true&output=csv',
-        'BD': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTDvfICYLfo93fAS6SmSmP5deJnM7fYm-N3uiruN0g_e9ZKrq-okIQ1wMlwnNEnq-XAdjJD8D9c-R85/pub?gid=607848019&single=true&output=csv'
+        'SM': `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=0`,
+        'AN': `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=263516767`,
+        'BD': `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=607848019`
     };
-    const layers = {
-        "Standard": L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'),
-        "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'),
-        "Dark": L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png')
-    };
+    const layers = { "Standard": L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'), "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'), "Dark": L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png') };
     const map = L.map('map', {zoomControl: false, zoomAnimation: true}).setView([20, 100], 3);
     layers.Standard.addTo(map); L.control.layers(layers).addTo(map);
     
     let currentProd = 'SM', activeMarkers = [], currentRawData = [], countryChart = null;
 
-    // [v13.17 핵심: 쉼표 포함 데이터도 방어하는 정밀 CSV 파서]
+    map.on('baselayerchange', (e) => { if (currentRawData.length > 0) renderEverything(currentRawData); });
+    function showUpdateModal() { document.getElementById('admin-password').value = ""; document.getElementById('auth-section').style.display = 'block'; document.getElementById('data-input-section').style.display = 'none'; document.getElementById('update-modal').style.display = 'block'; }
+    function closeModal() { document.getElementById('update-modal').style.display = 'none'; }
+    function verifyAdmin() { if (document.getElementById('admin-password').value === ADMIN_PASS) { document.getElementById('auth-section').style.display = 'none'; document.getElementById('data-input-section').style.display = 'block'; } else { alert("암호 불일치."); } }
+    function clearManualData() { if(confirm("초기화하시겠습니까?")) { localStorage.removeItem(`MANUAL_DATA_${currentProd}`); location.reload(); } }
+
     function parseCSV(text) {
         const rows = []; let row = []; let val = ""; let q = 0;
         for (let i = 0; i < text.length; i++) {
@@ -179,23 +181,24 @@
                 else if (h === 'company') obj['company'] = v;
                 else obj[h] = v;
             });
-            // AN/BD 특화: Period 문자열(Jan 15 ~ Feb 28) 기반 날짜 강제 생성
             if ((!obj.start_date || obj.start_date === "0" || obj.start_date === "") && obj.period) {
                 const parts = obj.period.split('~').map(s => s.trim());
-                if (parts.length === 2) { 
-                    const year = new Date().getFullYear();
-                    obj.start_date = parts[0] + " " + year;
-                    obj.end_date = parts[1] + " " + year;
-                }
+                if (parts.length === 2) { const year = new Date().getFullYear(); obj.start_date = parts[0] + " " + year; obj.end_date = parts[1] + " " + year; }
             }
             return obj;
         });
     }
 
+    function saveManualData() {
+        const input = document.getElementById('csv-input').value;
+        const parsed = parseUniversal(input);
+        if(parsed.length > 0) { localStorage.setItem(`MANUAL_DATA_${currentProd}`, JSON.stringify(parsed)); alert(parsed.length + "건 저장 완료."); closeModal(); renderEverything(parsed); }
+    }
+
     function flyToTarget(lat, lng, zoom, marker = null) {
-        const sidebarWidth = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 320;
-        const targetPoint = map.project([lat, lng], zoom).subtract([sidebarWidth / 2, 0]);
-        map.flyTo(map.unproject(targetPoint, zoom), zoom, { duration: 1.5 });
+        const off = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 320;
+        const pt = map.project([lat, lng], zoom).subtract([off / 2, 0]);
+        map.flyTo(map.unproject(pt, zoom), zoom, { duration: 1.5 });
         if(marker) map.once('moveend', () => marker.openPopup());
     }
 
@@ -240,20 +243,20 @@
     }
 
     async function switchProduct(prod) {
-        currentProd = prod; currentRawData = []; // [v13.17 핵심: 이전 데이터 비우기]
+        currentProd = prod; currentRawData = [];
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.id === `btn-${prod}`));
         const ovl = document.getElementById('sync-overlay'); ovl.style.display = 'flex'; ovl.style.opacity = '1';
         document.getElementById('sync-main-text').innerText = `${prod} 데이터 동기화 중...`;
         
+        // 메모리 초기화 방지: 수동 데이터가 있으면 우선 로드
+        const manual = localStorage.getItem(`MANUAL_DATA_${prod}`);
+        if(manual) { currentRawData = JSON.parse(manual); renderEverything(currentRawData); document.getElementById('sync-main-text').innerText = "수동 데이터 로드됨"; setTimeout(() => { ovl.style.opacity = '0'; setTimeout(() => { ovl.style.display = 'none'; }, 600); }, 800); return; }
+
         try {
             const res = await fetch(SHEET_URLS[prod] + "&t=" + new Date().getTime());
-            if (res.ok) { 
-                const text = await res.text(); 
-                currentRawData = parseUniversal(text); 
-                document.getElementById('sync-main-text').innerText = "동기화 완료!";
-            } else { throw new Error(); }
+            if (res.ok) { const text = await res.text(); currentRawData = parseUniversal(text); document.getElementById('sync-main-text').innerText = "동기화 완료!"; }
+            else { throw new Error(); }
         } catch(e) { 
-            console.error("Sync Error");
             if(prod === 'SM') currentRawData = typeof data_sm !== 'undefined' ? data_sm : [];
             else if(prod === 'AN') currentRawData = typeof data_an !== 'undefined' ? data_an : [];
             else if(prod === 'BD') currentRawData = typeof data_bd !== 'undefined' ? data_bd : [];
@@ -331,6 +334,7 @@
         document.getElementById('chart-panel').classList.add('active');
         countryChart = new Chart(ctx, { type: 'pie', data: { labels: labels, datasets: [{ data: data, backgroundColor: ['#0A2647', '#1597BB', '#2ECC71', '#F1C40F', '#E74C3C', '#9B59B6', '#34495E', '#95A5A6', '#D35400', '#BDC3C7'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { datalabels: { color: 'white', font: { weight: 'bold' }, formatter: (v, ctx) => { let sum = 0; ctx.chart.data.datasets[0].data.forEach(d => sum += d); return (v * 100 / sum).toFixed(1) + "%"; } }, legend: { position: 'right' } } }, plugins: [ChartDataLabels] });
     }
+
     window.onload = () => switchProduct('SM');
 </script>
 </body>
